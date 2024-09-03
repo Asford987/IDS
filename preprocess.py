@@ -88,3 +88,9 @@ class PreprocessingFlow(FlowSpec):
         self.reduced_test = self.pca.transform(self.pruned_test)
         self.reduced_train = pd.DataFrame(self.reduced_train, columns=self.name_cols)
         self.reduced_test = pd.DataFrame(self.reduced_test, columns=self.name_cols)
+        self.next(self.end)
+        
+    @step
+    def end(self):
+        print("End of PreprocessingFlow")    
+    

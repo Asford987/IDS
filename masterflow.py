@@ -15,7 +15,8 @@ class MasterFlow(FlowSpec):
 
         self.preprocessed_train = preprocessing_flow.data.reduced_train
         self.preprocessed_test = preprocessing_flow.data.reduced_test
-        self.labels = preprocessing_flow.data.labels
+        self.target_train = preprocessing_flow.data.target_train
+        self.target_test = preprocessing_flow.data.target_test
         
         print("Preprocessing completed.")
         self.next(self.run_keras_tuner)
@@ -24,8 +25,10 @@ class MasterFlow(FlowSpec):
     def run_keras_tuner(self):
         keras_tuner_flow = Flow('KerasTunerFlow')
         keras_tuner_flow.run(parameters={
-            'X': self.preprocessed_train,
-            'y': self.labels
+            'X_train': self.preprocessed_train,
+            'y_train': self.target_train,
+            'X_test': self.preprocessed_test,
+            'y_test': self.target_test,
         })
 
         print("KerasTuner completed.")
