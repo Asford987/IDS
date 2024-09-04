@@ -34,11 +34,11 @@ class PreprocessingFlow(FlowSpec):
         self.train_data_info = buffer.getvalue()
         self.train_data_unique = self.df_train.nunique().to_dict()
         
-        self.numerical_columns = self.df_train.select_dtypes(exclude=['category']).columns
         self.target_train = self.df_train['label']
         self.df_train = self.df_train.drop(columns=['label', 'Drate'])
         self.target_test = self.df_test['label']
         self.df_test = self.df_test.drop(columns=['label', 'Drate'])
+        self.numerical_columns = self.df_train.columns
         self.num_missing_values_df_train = self.df_train.isna().sum().sum()
         self.df_train_description = self.df_train.describe()
         self.next(self.outlier_filtering)
@@ -88,9 +88,22 @@ class PreprocessingFlow(FlowSpec):
         self.reduced_test = self.pca.transform(self.pruned_test)
         self.reduced_train = pd.DataFrame(self.reduced_train, columns=self.name_cols)
         self.reduced_test = pd.DataFrame(self.reduced_test, columns=self.name_cols)
+        self.next(self.save_artifacts)
+        
+    @step
+    def save_artifacts(self):
+        import os, numpy as np
+        if not os.path.exists('artifacts'): os.makedirs('artifacts')
+        if not os.path.exists('artifacts/clean_data'): os.makedirs('artifacts/clean_data')
+        self.reduced_train.to_csv('artifacts/clean_data/X_train.csv')
+        self.reduced_test.to_csv('artifacts/clean_data/X_test.csv')
+        np.save('artifacts/clean_data/y_train', self.target_train)
+        np.save('artifacts/clean_data/y_test', self.target_test)
         self.next(self.end)
         
     @step
     def end(self):
         print("End of PreprocessingFlow")    
     
+if __name__ == '__main__':
+    PreprocessingFlow()

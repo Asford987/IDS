@@ -1,9 +1,10 @@
 import os
+
+import pandas as pd
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import warnings
 warnings.filterwarnings("ignore")
-import numpy as np
-from metaflow import FlowSpec, step, Parameter
+from metaflow import FlowSpec, step, Parameter, trigger_on_finish
 import numpy as np
 from moe import *
 import optuna
@@ -15,16 +16,18 @@ from torch.utils.data import DataLoader, TensorDataset
 
 
 
-class KerasTunerFlow(FlowSpec):
+@trigger_on_finish(flow='PreprocessingFlow')
+class HyperparameterTuningFlow(FlowSpec):
 
-    X_train = Parameter('X_train', required=True)
-    y_train = Parameter('y_train', required=True)
-    X_test = Parameter('X_test', required=True)
-    y_test = Parameter('y_test', required=True)
+    artifact_storage = Parameter('artifact_storage', default='artifacts/clean_data')
     n_trials = Parameter('n_trials', default=20)
 
     @step
     def start(self):
+        self.X_train = pd.read_csv(self.artifact_storage + '/X_train.csv')
+        self.X_test = pd.read_csv(self.artifact_storage + '/X_test.csv')
+        self.y_train = np.load(self.artifact_storage + '/y_train.npy')
+        self.y_test = np.load(self.artifact_storage + '/y_test.npy')
         self.input_dim = self.X_train.shape[1]
         self.output_dim = 1
         self.next(self.tuning)
@@ -84,7 +87,7 @@ class KerasTunerFlow(FlowSpec):
         }
         study = optuna.create_study(direction="maximize")
         
-        study.optimize(lambda trial: objective(trial, self.X_train, self.y_train, self.X_val, self.y_val, self.input_dim, self.output_dim), 
+        study.optimize(lambda trial: objective(trial, self.X_train, self.y_train, self.X_test, self.y_test, self.input_dim, self.output_dim), 
                     n_trials=self.n_trials)
         
         print(f"Best Hyperparameters: {study.best_params}")
@@ -111,19 +114,23 @@ class KerasTunerFlow(FlowSpec):
         )
         
         train_loader = DataLoader(TensorDataset(self.X_train, self.y_train), batch_size=2048, shuffle=True)
-        val_loader = DataLoader(TensorDataset(self.X_val, self.y_val), batch_size=2048)
+        val_loader = DataLoader(TensorDataset(self.X_test, self.y_test), batch_size=2048)
         
         trainer.fit(best_model, train_loader, val_loader)
         
         expert_usage_logger.plot_expert_usage()
         
-        return best_model, study.best_params
+        self.best_model, self.study = best_model, study
+        self.next(self.analyze_best_model_results)
 
     @step
     def analyze_best_model_results(self):
-        self.best_model.get_expert_activations(self.X)
+        # self.best_model.get_expert_activations(self.X)
         self.next(self.end)
 
     @step
     def end(self):
-        print("KerasTuner flow completed successfully.")
+        print("Hyperparameter tuning flow completed successfully.")
+
+if __name__ == '__main__':
+    HyperparameterTuningFlow()
