@@ -57,21 +57,19 @@ class HyperparameterTuningFlow(FlowSpec):
                 dropout_rate=dropout_rate
             )
             
-            expert_usage_logger = ExpertUsageLogger(model)
-
             logger = TensorBoardLogger("logs", name="MoE_experimental")
+            csv_logger = pl.loggers.CSVLogger("logs", name="MoE_experimental")
             lr_monitor = LearningRateMonitor(logging_interval='epoch')
-            checkpoint_callback = ModelCheckpoint(monitor='val_f2', mode='max') 
 
             trainer = pl.Trainer(
                 max_epochs=300,
-                logger=logger,
-                callbacks=[lr_monitor, checkpoint_callback, expert_usage_logger],
+                logger=[logger, csv_logger],
+                callbacks=[lr_monitor],
                 accelerator='gpu',
             )
             
-            train_loader = DataLoader(TensorDataset(torch.tensor(X_train.values, device='cuda'), torch.tensor(y_train, device='cuda')), batch_size=8192, shuffle=True)
-            val_loader = DataLoader(TensorDataset(torch.tensor(X_val.values, device='cuda'), torch.tensor(y_val, device='cuda')), batch_size=8192)
+            train_loader = DataLoader(TensorDataset(torch.tensor(X_train.values, device='cuda'), torch.tensor(y_train, device='cuda')), batch_size=4096, shuffle=True)
+            val_loader = DataLoader(TensorDataset(torch.tensor(X_val.values, device='cuda'), torch.tensor(y_val, device='cuda')), batch_size=4096)
             
             trainer.fit(model, train_loader, val_loader)
             
@@ -107,10 +105,16 @@ class HyperparameterTuningFlow(FlowSpec):
         
         expert_usage_logger = ExpertUsageLogger(best_model)
 
+        logger = TensorBoardLogger("logs", name="MoE_experimental")
+        csv_logger = pl.loggers.CSVLogger("logs", name="MoE_experimental")
+        lr_monitor = LearningRateMonitor(logging_interval='epoch')
+        checkpoint_callback = ModelCheckpoint(monitor='val_f2', mode='max') 
+
         trainer = pl.Trainer(
-            max_epochs=50,
-            callbacks=[expert_usage_logger],
-            accelerator='gpu'
+            max_epochs=300,
+            logger=[logger, csv_logger],
+            callbacks=[lr_monitor, checkpoint_callback, expert_usage_logger],
+            accelerator='gpu',
         )
         
         train_loader = DataLoader(TensorDataset(self.X_train, self.y_train), batch_size=2048, shuffle=True)
@@ -125,7 +129,7 @@ class HyperparameterTuningFlow(FlowSpec):
 
     @step
     def analyze_best_model_results(self):
-        # self.best_model.get_expert_activations(self.X)
+        self.best_model.get_expert_activations(self.X)
         self.next(self.end)
 
     @step

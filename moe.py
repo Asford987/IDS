@@ -2,7 +2,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import warnings
 warnings.filterwarnings("ignore")
-from sklearn.metrics import fbeta_score
+from sklearn.metrics import fbeta_score, precision_score, recall_score
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -78,15 +78,22 @@ class MixtureOfExperts(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         loss = self.criterion(y_hat, y)
-        self.log('train_loss', loss)
+        self.log('train_loss', loss, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        y_hat = self(x)
+        with torch.no_grad():
+            y_hat = self(x)
         preds = torch.argmax(y_hat, dim=1)
+        loss = self.criterion(y_hat, y)
         f2_score = fbeta_score(y.cpu().numpy(), preds.cpu().numpy(), beta=2, average='macro')
-        self.log('val_f2', f2_score, prog_bar=True, sync_dist=True)
+        prec = precision_score(y.cpu().numpy(), preds.cpu().numpy(), average='macro')
+        recall = recall_score(y.cpu().numpy(), preds.cpu().numpy(), average='macro')
+        self.log('val_loss', loss, logger=True)
+        self.log('val_precision', prec, logger=True)
+        self.log('val_recall', recall, logger=True)
+        self.log('val_f2', f2_score, prog_bar=True, logger=True)
         return {'val_f2': f2_score}
 
     def configure_optimizers(self):
@@ -103,9 +110,14 @@ class MixtureOfExperts(pl.LightningModule):
                 'frequency': 1
             }
         }
-
+        
     def on_fit_start(self):
         self.expert_usage_count = self.expert_usage_count.to(self.device)
+        
+    def get_expert_activations(self, x):
+        expert_outputs = torch.stack([expert(x) for expert in self.experts], dim=1)
+        gate_output = self.gate(x)
+        return expert_outputs, gate_output
 
 class ExpertUsageLogger(pl.Callback):
     def __init__(self, moe_model):
