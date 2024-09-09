@@ -24,11 +24,12 @@ class HyperparameterTuningFlow(FlowSpec):
 
     @step
     def start(self):
-        self.X_train = pd.read_csv(self.artifact_storage + '/X_train.csv')
-        self.X_test = pd.read_csv(self.artifact_storage + '/X_test.csv')
-        self.y_train = np.load(self.artifact_storage + '/y_train.npy')
-        self.y_test = np.load(self.artifact_storage + '/y_test.npy')
+        self.X_train = pd.read_csv(self.artifact_storage + '/X_train.csv').astype(np.float32)
+        self.X_test = pd.read_csv(self.artifact_storage + '/X_test.csv').astype(np.float32)
+        self.y_train = np.asarray(np.load(self.artifact_storage + '/y_train.npy'), np.float32)
+        self.y_test = np.asarray(np.load(self.artifact_storage + '/y_test.npy'), np.float32)
         self.input_dim = self.X_train.shape[1]
+        print(self.X_train.shape, self.X_test.shape, self.y_train.shape, self.y_test.shape)
         self.output_dim = 1
         self.next(self.tuning)
 

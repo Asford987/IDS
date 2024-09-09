@@ -64,7 +64,7 @@ class PreprocessingFlow(FlowSpec):
     @step
     def encode_labels(self):
         self.encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
-        self.target_train = self.encoder.fit_transform(self.target_train.values.reshape(-1, 1))
+        self.target_train = self.encoder.fit_transform(self.fitlered_target_train.values.reshape(-1, 1))
         self.target_test = self.encoder.transform(self.target_test.values.reshape(-1, 1))
         self.next(self.feature_correlation_filtering)
 
@@ -97,8 +97,8 @@ class PreprocessingFlow(FlowSpec):
         if not os.path.exists('artifacts/clean_data'): os.makedirs('artifacts/clean_data')
         self.reduced_train.to_csv('artifacts/clean_data/X_train.csv')
         self.reduced_test.to_csv('artifacts/clean_data/X_test.csv')
-        np.save('artifacts/clean_data/y_train', self.target_train)
-        np.save('artifacts/clean_data/y_test', self.target_test)
+        np.save('artifacts/clean_data/y_train', self.target_train.astype(np.float32))
+        np.save('artifacts/clean_data/y_test', self.target_test.astype(np.float32))
         self.next(self.end)
         
     @step
