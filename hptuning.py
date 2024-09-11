@@ -30,6 +30,7 @@ class HyperparameterTuningFlow(FlowSpec):
         self.y_test = np.asarray(np.load(self.artifact_storage + '/y_test.npy'), np.float32)
         self.input_dim = self.X_train.shape[1]
         print(self.X_train.shape, self.X_test.shape, self.y_train.shape, self.y_test.shape)
+        print(len(np.unique(self.y_train)), len(np.unique(self.y_test)))
         self.output_dim = 1
         self.next(self.tuning)
 
@@ -47,11 +48,10 @@ class HyperparameterTuningFlow(FlowSpec):
             chosen_gate_hidden_units = gate_hidden_units_options[chosen_gate_hidden_units_str]
 
             dropout_rate = trial.suggest_float('dropout_rate', 0.0, 0.5)
-            
             model = MixtureOfExperts(
                 input_dim=input_dim,
                 output_dim=output_dim,
-                num_experts=output_dim,
+                num_experts=len(np.unique(y_train)),
                 expert_hidden_units=[32, 64, 32],
                 gate_hidden_units=chosen_gate_hidden_units,
                 num_active_experts=3,
@@ -97,7 +97,7 @@ class HyperparameterTuningFlow(FlowSpec):
         best_model = MixtureOfExperts(
             input_dim=self.input_dim,
             output_dim=self.output_dim,
-            num_experts=self.output_dim, 
+            num_experts=len(np.unique(self.y_train)), 
             expert_hidden_units=[32, 64, 32],
             gate_hidden_units=best_gate_hidden_units,
             num_active_experts=3,
@@ -115,11 +115,10 @@ class HyperparameterTuningFlow(FlowSpec):
             max_epochs=300,
             logger=[logger, csv_logger],
             callbacks=[lr_monitor, checkpoint_callback, expert_usage_logger],
-            accelerator='gpu',
         )
         
-        train_loader = DataLoader(TensorDataset(self.X_train, self.y_train), batch_size=2048, shuffle=True)
-        val_loader = DataLoader(TensorDataset(self.X_test, self.y_test), batch_size=2048)
+        train_loader = DataLoader(TensorDataset(self.X_train, self.y_train), batch_size=4096, shuffle=True)
+        val_loader = DataLoader(TensorDataset(self.X_test, self.y_test), batch_size=4096)
         
         trainer.fit(best_model, train_loader, val_loader)
         

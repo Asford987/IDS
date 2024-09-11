@@ -19,30 +19,27 @@ class PreprocessingFlow(FlowSpec):
     @step
     def start(self):
         self.df_train = pd.read_parquet(self.train_data_path)
-        self.df_test = pd.read_parquet(self.test_data_path)
         
-        df_combined = pd.concat([self.df_train, self.df_test])
-        df_sampled, _ = train_test_split(df_combined, train_size=self.usage_ratio, stratify=df_combined['label'])
-        self.df_train: pd.DataFrame = df_sampled[df_sampled.index.isin(self.df_train.index)]
-        self.df_test: pd.DataFrame = df_sampled[df_sampled.index.isin(self.df_test.index)]
+        # Sample from the train and test sets individually to preserve label consistency
+        self.df_train, _ = train_test_split(self.df_train, train_size=self.usage_ratio, stratify=self.df_train['label'])
+        self.df_train, self.df_test = train_test_split(self.df_train, train_size=0.8, stratify=self.df_train['label'])
+
         numeric_columns = self.df_train.select_dtypes(include=[np.number]).columns
         self.df_train[numeric_columns] = self.df_train[numeric_columns].astype(np.float32)
         self.df_test[numeric_columns] = self.df_test[numeric_columns].astype(np.float32)
-        
-        buffer = StringIO()
-        self.df_train.info(buf=buffer)
-        self.train_data_info = buffer.getvalue()
-        self.train_data_unique = self.df_train.nunique().to_dict()
-        
+
         self.target_train = self.df_train['label']
         self.df_train = self.df_train.drop(columns=['label', 'Drate'])
         self.target_test = self.df_test['label']
         self.df_test = self.df_test.drop(columns=['label', 'Drate'])
+
         self.numerical_columns = self.df_train.columns
         self.num_missing_values_df_train = self.df_train.isna().sum().sum()
         self.df_train_description = self.df_train.describe()
-        self.next(self.outlier_filtering)
 
+        print(len(np.unique(self.target_train)), len(np.unique(self.target_test)))
+        self.next(self.outlier_filtering)
+    
     @step
     def outlier_filtering(self):
         z_scores = np.abs(stats.zscore(self.df_train[self.numerical_columns]))
@@ -50,7 +47,7 @@ class PreprocessingFlow(FlowSpec):
 
         self.filtered_train = self.df_train[~self.outlier_mask]
         self.fitlered_target_train = self.target_train[~self.outlier_mask]
-        
+        print(len(np.unique(self.fitlered_target_train)))
         self.num_filtered_samples = len(self.filtered_train)        
         self.next(self.normalization)
         
@@ -66,6 +63,11 @@ class PreprocessingFlow(FlowSpec):
         self.encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
         self.target_train = self.encoder.fit_transform(self.fitlered_target_train.values.reshape(-1, 1))
         self.target_test = self.encoder.transform(self.target_test.values.reshape(-1, 1))
+        
+        indices = np.where(self.target_test != -1)[0]
+        self.target_test = self.target_test[indices]
+        self.normalized_test = self.normalized_test[indices]
+        print(len(np.unique(self.target_train)), len(np.unique(self.target_test)))
         self.next(self.feature_correlation_filtering)
 
     @step
@@ -95,8 +97,8 @@ class PreprocessingFlow(FlowSpec):
         import os, numpy as np
         if not os.path.exists('artifacts'): os.makedirs('artifacts')
         if not os.path.exists('artifacts/clean_data'): os.makedirs('artifacts/clean_data')
-        self.reduced_train.to_csv('artifacts/clean_data/X_train.csv')
-        self.reduced_test.to_csv('artifacts/clean_data/X_test.csv')
+        self.reduced_train.to_csv('artifacts/clean_data/X_train.csv', index=False)
+        self.reduced_test.to_csv('artifacts/clean_data/X_test.csv', index=False)
         np.save('artifacts/clean_data/y_train', self.target_train.astype(np.float32))
         np.save('artifacts/clean_data/y_test', self.target_test.astype(np.float32))
         self.next(self.end)

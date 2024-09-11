@@ -46,47 +46,37 @@ class MixtureOfExperts(pl.LightningModule):
 
         self.experts = nn.ModuleList([ExpertModel(input_dim, output_dim, expert_hidden_units, dropout_rate) for _ in range(num_experts)])
         self.gate = GateModel(input_dim, num_experts, gate_hidden_units, dropout_rate)
-        self.num_active_experts = num_active_experts
+        self.top_k = num_active_experts
         self.expert_usage_count = torch.zeros(num_experts, dtype=torch.float32)
 
         self.learning_rate = learning_rate
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = nn.BCEWithLogitsLoss()
 
     def forward(self, x):
-        expert_outputs = torch.stack([expert(x) for expert in self.experts], dim=1)
-        gate_output = self.gate(x)
-
-        expert_usage_count_adjusted = self.expert_usage_count + 1e-10
-        importance_scores = gate_output / expert_usage_count_adjusted
-
-        top_n_expert_indices = torch.argsort(importance_scores, dim=1, descending=True)[:, :self.num_active_experts]
-        selected_expert_indices = top_n_expert_indices.view(-1)
-
-        self.expert_usage_count += torch.bincount(selected_expert_indices, minlength=len(self.experts)).float()
-
-        mask = torch.sum(F.one_hot(top_n_expert_indices, num_classes=len(self.experts)), dim=1)
-        masked_gate_output = gate_output * mask
-        normalized_gate_output = masked_gate_output / (torch.sum(masked_gate_output, dim=1, keepdim=True) + 1e-7)
-
-        masked_expert_outputs = torch.stack([expert_outputs[:, i] * normalized_gate_output[:, i].unsqueeze(1)
-                                              for i in range(len(self.experts))], dim=1)
-        final_output = torch.sum(masked_expert_outputs, dim=1)
-
-        return final_output
+        gating_weights = self.gate(x)
+        topk_weights, topk_indices = torch.topk(gating_weights, self.top_k, dim=-1)
+        gating_mask = torch.zeros_like(gating_weights).scatter_(-1, topk_indices, topk_weights)
+        expert_outputs = torch.stack([expert(x) for expert in self.experts], dim=-1)
+        output = torch.sum(expert_outputs * gating_mask.unsqueeze(2), dim=-1)
+        return output
 
     def training_step(self, batch, batch_idx):
         x, y = batch
+        num_classes = len(self.experts)
+        y_ = F.one_hot(y.long(), num_classes=num_classes).float().squeeze(1)
         y_hat = self(x)
-        loss = self.criterion(y_hat, y)
+        loss = self.criterion(y_hat, y_)
         self.log('train_loss', loss, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
+        num_classes = len(self.experts)
+        y_ = F.one_hot(y.long(), num_classes=num_classes).float().squeeze(1)
         with torch.no_grad():
             y_hat = self(x)
         preds = torch.argmax(y_hat, dim=1)
-        loss = self.criterion(y_hat, y)
+        loss = self.criterion(y_hat, y_)
         f2_score = fbeta_score(y.cpu().numpy(), preds.cpu().numpy(), beta=2, average='macro')
         prec = precision_score(y.cpu().numpy(), preds.cpu().numpy(), average='macro')
         recall = recall_score(y.cpu().numpy(), preds.cpu().numpy(), average='macro')
@@ -112,6 +102,8 @@ class MixtureOfExperts(pl.LightningModule):
         }
         
     def on_fit_start(self):
+        torch.cuda.empty_cache()
+        torch.cuda.init()
         self.expert_usage_count = self.expert_usage_count.to(self.device)
         
     def get_expert_activations(self, x):
