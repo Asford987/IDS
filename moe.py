@@ -100,17 +100,8 @@ class MixtureOfExperts(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='max', factor=0.1, patience=5, verbose=True
-        )
         return {
             'optimizer': optimizer,
-            'lr_scheduler': {
-                'scheduler': scheduler,
-                'monitor': 'val_f2',
-                'interval': 'epoch',
-                'frequency': 1
-            }
         }
         
     def on_fit_start(self):
@@ -125,7 +116,7 @@ class MixtureOfExperts(pl.LightningModule):
     
     def on_validation_epoch_end(self) -> None:
         average_f2_scores = self.f2_scores_per_class / torch.tensor(self.trainer.num_val_batches, device=self.f2_scores_per_class.device)
-        inverse_f2_scores = 1.0 / (average_f2_scores + 1e-5)  # Avoid division by zero
+        inverse_f2_scores = 1.0 / (average_f2_scores + 1e-5)
         
         self.class_weights = inverse_f2_scores / inverse_f2_scores.max()
         self.f2_scores_per_class = torch.ones(44, dtype=torch.float32).to(self.device)

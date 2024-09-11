@@ -13,7 +13,9 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from torch.utils.data import DataLoader, TensorDataset
+import logging
 
+logging.getLogger('metaflow').setLevel(logging.WARNING)
 
 
 @trigger_on_finish(flow='PreprocessingFlow')

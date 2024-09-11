@@ -1,11 +1,13 @@
 from metaflow import FlowSpec, step, Parameter
 import pandas as pd
 import numpy as np
-from io import StringIO
 from scipy import stats
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler
+import logging
+
+logging.getLogger('metaflow').setLevel(logging.WARNING)
 
 class PreprocessingFlow(FlowSpec):
     
@@ -19,8 +21,25 @@ class PreprocessingFlow(FlowSpec):
     @step
     def start(self):
         self.df_train = pd.read_parquet(self.train_data_path)
-        
-        # Sample from the train and test sets individually to preserve label consistency
+        def map_label(label):
+            if 'Benign' in label:
+                return 'benign'
+            elif 'ARP_Spoofing' in label:
+                return 'spoofing'
+            elif 'Recon' in label:
+                return 'recon'
+            elif 'MQTT' in label:
+                return 'MQTT'
+            elif 'DoS' in label and 'DDoS' not in label:
+                return 'DoS'
+            elif 'DDoS' in label:
+                return 'DDoS'
+            
+        self.df_train['label'] = self.df_train['label'].map(map_label)
+        self.next(self.split_data)
+
+    @step
+    def split_data(self):
         self.df_train, _ = train_test_split(self.df_train, train_size=self.usage_ratio, stratify=self.df_train['label'])
         self.df_train, self.df_test = train_test_split(self.df_train, train_size=0.8, stratify=self.df_train['label'])
 
