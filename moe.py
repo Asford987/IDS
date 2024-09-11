@@ -48,9 +48,11 @@ class MixtureOfExperts(pl.LightningModule):
         self.gate = GateModel(input_dim, num_experts, gate_hidden_units, dropout_rate)
         self.top_k = num_active_experts
         self.expert_usage_count = torch.zeros(num_experts, dtype=torch.float32)
-
+        self.num_classes = num_experts
         self.learning_rate = learning_rate
-        self.criterion = nn.BCEWithLogitsLoss()
+        self.class_weights = torch.ones(44)
+        self.f2_scores_per_class = torch.ones(44, dtype=torch.float32) 
+        self.criterion = nn.CrossEntropyLoss(self.class_weights.to(self.device))
 
     def forward(self, x):
         gating_weights = self.gate(x)
@@ -80,11 +82,21 @@ class MixtureOfExperts(pl.LightningModule):
         f2_score = fbeta_score(y.cpu().numpy(), preds.cpu().numpy(), beta=2, average='macro')
         prec = precision_score(y.cpu().numpy(), preds.cpu().numpy(), average='macro')
         recall = recall_score(y.cpu().numpy(), preds.cpu().numpy(), average='macro')
+        f2_scores = []
+        for class_idx in range(44):  # Assuming 44 classes
+            y_true_class = (y.cpu().numpy() == class_idx).astype(int)
+            y_pred_class = (preds.cpu().numpy() == class_idx).astype(int)
+            f2_score_class = fbeta_score(y_true_class, y_pred_class, beta=2, zero_division=1)
+            f2_scores.append(f2_score_class)
+        
+        f2_scores = torch.tensor(f2_scores, dtype=torch.float32, device=self.f2_scores_per_class.device)
+        self.f2_scores_per_class += f2_scores 
+        
         self.log('val_loss', loss, logger=True)
         self.log('val_precision', prec, logger=True)
         self.log('val_recall', recall, logger=True)
         self.log('val_f2', f2_score, prog_bar=True, logger=True)
-        return {'val_f2': f2_score}
+        return {'val_f2': f2_score, 'val_precision': prec, 'val_loss': loss, 'val_recall': recall}
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
@@ -110,6 +122,16 @@ class MixtureOfExperts(pl.LightningModule):
         expert_outputs = torch.stack([expert(x) for expert in self.experts], dim=1)
         gate_output = self.gate(x)
         return expert_outputs, gate_output
+    
+    def on_validation_epoch_end(self) -> None:
+        average_f2_scores = self.f2_scores_per_class / torch.tensor(self.trainer.num_val_batches, device=self.f2_scores_per_class.device)
+        inverse_f2_scores = 1.0 / (average_f2_scores + 1e-5)  # Avoid division by zero
+        
+        self.class_weights = inverse_f2_scores / inverse_f2_scores.max()
+        self.f2_scores_per_class = torch.ones(44, dtype=torch.float32).to(self.device)
+                
+    def on_train_epoch_start(self) -> None:
+        self.criterion = nn.CrossEntropyLoss(self.class_weights.to(self.device))
 
 class ExpertUsageLogger(pl.Callback):
     def __init__(self, moe_model):
