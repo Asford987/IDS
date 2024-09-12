@@ -28,8 +28,8 @@ class HyperparameterTuningFlow(FlowSpec):
     def start(self):
         self.X_train = pd.read_csv(self.artifact_storage + '/X_train.csv').astype(np.float32)
         self.X_test = pd.read_csv(self.artifact_storage + '/X_test.csv').astype(np.float32)
-        self.y_train = np.asarray(np.load(self.artifact_storage + '/y_train.npy'), np.float32)
-        self.y_test = np.asarray(np.load(self.artifact_storage + '/y_test.npy'), np.float32)
+        self.y_train = np.asarray(np.load(self.artifact_storage + '/y_train.npy'), np.int64)
+        self.y_test = np.asarray(np.load(self.artifact_storage + '/y_test.npy'), np.int64)
         self.input_dim = self.X_train.shape[1]
         print(self.X_train.shape, self.X_test.shape, self.y_train.shape, self.y_test.shape)
         print(len(np.unique(self.y_train)), len(np.unique(self.y_test)))
@@ -69,6 +69,7 @@ class HyperparameterTuningFlow(FlowSpec):
                 logger=[logger, csv_logger],
                 callbacks=[lr_monitor],
                 accelerator='gpu',
+
             )
             
             train_loader = DataLoader(TensorDataset(torch.tensor(X_train.values, device='cuda'), torch.tensor(y_train, device='cuda')), batch_size=4096, shuffle=True)
@@ -108,8 +109,8 @@ class HyperparameterTuningFlow(FlowSpec):
         
         expert_usage_logger = ExpertUsageLogger(best_model)
 
-        logger = TensorBoardLogger("logs", name="MoE_experimental")
-        csv_logger = pl.loggers.CSVLogger("logs", name="MoE_experimental")
+        logger = TensorBoardLogger("logs", name="MoE_tensorboard")
+        csv_logger = pl.loggers.CSVLogger("logs", name="MoE_csv")
         lr_monitor = LearningRateMonitor(logging_interval='epoch')
         checkpoint_callback = ModelCheckpoint(monitor='val_f2', mode='max') 
 

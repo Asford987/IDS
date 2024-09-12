@@ -61,14 +61,33 @@ class PreprocessingFlow(FlowSpec):
     
     @step
     def outlier_filtering(self):
-        z_scores = np.abs(stats.zscore(self.df_train[self.numerical_columns]))
-        self.outlier_mask = np.any(z_scores > self.outlier_threshold, axis=1)
-
-        self.filtered_train = self.df_train[~self.outlier_mask]
-        self.fitlered_target_train = self.target_train[~self.outlier_mask]
+        filtered_dataframes = []
+        filtered_targets = []
+        
+        for class_label in np.unique(self.target_train):
+            class_mask = self.target_train == class_label
+            class_df_train = self.df_train[class_mask]
+            class_target_train = self.target_train[class_mask]
+            
+            z_scores = np.abs(stats.zscore(class_df_train[self.numerical_columns]))
+            outlier_mask = np.any(z_scores > self.outlier_threshold, axis=1)
+            
+            filtered_class_df_train = class_df_train[~outlier_mask]
+            filtered_class_target_train = class_target_train[~outlier_mask]
+            
+            filtered_dataframes.append(filtered_class_df_train)
+            filtered_targets.append(filtered_class_target_train)
+            
+            print(f'{len(outlier_mask)} data points removed for class {class_label}')
+        
+        self.filtered_train = pd.concat(filtered_dataframes, axis=0)
+        self.fitlered_target_train = np.concatenate(filtered_targets)
+        
         print(len(np.unique(self.fitlered_target_train)))
-        self.num_filtered_samples = len(self.filtered_train)        
+        self.num_filtered_samples = len(self.filtered_train)
+        
         self.next(self.normalization)
+
         
     @step
     def normalization(self):
@@ -80,7 +99,7 @@ class PreprocessingFlow(FlowSpec):
     @step
     def encode_labels(self):
         self.encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
-        self.target_train = self.encoder.fit_transform(self.fitlered_target_train.values.reshape(-1, 1))
+        self.target_train = self.encoder.fit_transform(self.fitlered_target_train.reshape(-1, 1))
         self.target_test = self.encoder.transform(self.target_test.values.reshape(-1, 1))
         
         indices = np.where(self.target_test != -1)[0]

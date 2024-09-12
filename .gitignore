@@ -1,5 +1,6 @@
 CIC_IoMT_*
-logs
+*logs
 .metaflow
 __pycache__
 artifacts
+*.ckpt
