@@ -1,4 +1,6 @@
 import os
+
+import numpy as np
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import warnings
 warnings.filterwarnings("ignore")
@@ -7,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
+from sklearn.utils.class_weight import compute_class_weight
 
 class ExpertModel(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_units, dropout_rate):
@@ -40,7 +43,9 @@ class GateModel(nn.Module):
 
 
 class MixtureOfExperts(pl.LightningModule):
-    def __init__(self, input_dim, output_dim, num_experts, expert_hidden_units, gate_hidden_units, num_active_experts, dropout_rate, learning_rate=0.00011803206356517298):
+    def __init__(self, input_dim, output_dim, num_experts, expert_hidden_units, 
+                 gate_hidden_units, num_active_experts, dropout_rate, 
+                 learning_rate=1e-2, class_weights=None):
         super(MixtureOfExperts, self).__init__()
         self.save_hyperparameters()
 
@@ -50,8 +55,7 @@ class MixtureOfExperts(pl.LightningModule):
         self.expert_usage_count = torch.zeros(num_experts, dtype=torch.float32)
         self.num_classes = num_experts
         self.learning_rate = learning_rate
-        self.class_weights = torch.ones(self.num_classes)
-        self.f2_scores_per_class = torch.ones(self.num_classes, dtype=torch.float32) 
+        self.class_weights = torch.tensor(class_weights, dtype=torch.float32) if class_weights is not None else torch.ones(self.num_classes)
         self.criterion = nn.CrossEntropyLoss(self.class_weights.to(self.device))
 
     def forward(self, x):
@@ -69,7 +73,6 @@ class MixtureOfExperts(pl.LightningModule):
     
     def on_fit_start(self):
         torch.cuda.empty_cache()
-        torch.cuda.init()
         self.expert_usage_count = self.expert_usage_count.to(self.device)
         
     def on_train_epoch_start(self) -> None:
@@ -78,8 +81,8 @@ class MixtureOfExperts(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
-        loss = self.criterion(y_hat, y.squeeze(1))
-        self.log('train_loss', loss, logger=True)
+        loss = self.criterion(y_hat, y)
+        self.log('train_loss', loss, logger=True, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -87,37 +90,38 @@ class MixtureOfExperts(pl.LightningModule):
         with torch.no_grad():
             y_hat = self(x)
         preds = torch.argmax(y_hat, dim=1)
-        loss = self.criterion(y_hat, y.squeeze(1))
-        f2_score = fbeta_score(y.cpu().numpy(), preds.cpu().numpy(), beta=2, average='macro')
-        prec = precision_score(y.cpu().numpy(), preds.cpu().numpy(), average='macro')
-        recall = recall_score(y.cpu().numpy(), preds.cpu().numpy(), average='macro')
-        f2_scores = []
-        for class_idx in range(self.num_classes):
-            y_true_class = (y.cpu().numpy() == class_idx).astype(int)
-            y_pred_class = (preds.cpu().numpy() == class_idx).astype(int)
-            f2_score_class = fbeta_score(y_true_class, y_pred_class, beta=2, zero_division=1)
-            f2_scores.append(f2_score_class)
+        self.val_preds.append(preds.cpu())
+        self.val_targets.append(y.cpu())
+
+        loss = self.criterion(y_hat, y)
+        self.log('val_loss', loss, logger=True, prog_bar=True)
+        return loss
+
+    def on_validation_epoch_start(self):
+        self.val_preds = []
+        self.val_targets = []
+
+    def on_validation_epoch_end(self):
+        preds = torch.cat(self.val_preds)
+        targets = torch.cat(self.val_targets)
         
-        f2_scores = torch.tensor(f2_scores, dtype=torch.float32, device=self.f2_scores_per_class.device)
-        self.f2_scores_per_class += f2_scores 
-        
-        self.log('val_loss', loss, logger=True)
+        f2_score_macro = fbeta_score(targets.numpy(), preds.numpy(), beta=2, average='macro')
+        prec = precision_score(targets.numpy(), preds.numpy(), average='macro')
+        recall = recall_score(targets.numpy(), preds.numpy(), average='macro')
+
+        # Compute per-class F2 scores
+        f2_scores = fbeta_score(targets.numpy(), preds.numpy(), beta=2, average=None, zero_division=1)
+        f2_scores = torch.tensor(f2_scores, dtype=torch.float32).to(self.device)
+
+        # Log metrics
         self.log('val_precision', prec, logger=True)
         self.log('val_recall', recall, logger=True)
-        self.log('val_f2', f2_score, prog_bar=True, logger=True)
-        return {'val_f2': f2_score, 'val_precision': prec, 'val_loss': loss, 'val_recall': recall}
-    
-    def on_validation_epoch_end(self) -> None:
-        average_f2_scores = self.f2_scores_per_class / torch.tensor(self.trainer.num_val_batches, device=self.f2_scores_per_class.device)
-        inverse_f2_scores = 1.0 / (average_f2_scores + 1e-5)
-        
-        self.class_weights = inverse_f2_scores / inverse_f2_scores.max()
-        self.f2_scores_per_class = torch.ones(self.num_classes, dtype=torch.float32).to(self.device)
+        self.log('val_f2', f2_score_macro, prog_bar=True, logger=True)
     
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='max', factor=0.1, patience=10, verbose=True, min_lr=1e-6
+            optimizer, mode='max', factor=0.5, patience=5, verbose=True, min_lr=1e-6
         )
         
         return {

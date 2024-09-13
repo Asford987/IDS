@@ -30,6 +30,7 @@ class HyperparameterTuningFlow(FlowSpec):
         self.X_test = pd.read_csv(self.artifact_storage + '/X_test.csv').astype(np.float32)
         self.y_train = np.asarray(np.load(self.artifact_storage + '/y_train.npy'), np.int64)
         self.y_test = np.asarray(np.load(self.artifact_storage + '/y_test.npy'), np.int64)
+        self.class_weights = np.load(self.artifact_storage + '/class_weights.npy')
         self.input_dim = self.X_train.shape[1]
         print(self.X_train.shape, self.X_test.shape, self.y_train.shape, self.y_test.shape)
         print(len(np.unique(self.y_train)), len(np.unique(self.y_test)))
@@ -38,7 +39,7 @@ class HyperparameterTuningFlow(FlowSpec):
 
     @step
     def tuning(self):
-        def objective(trial, X_train, y_train, X_val, y_val, input_dim, output_dim):
+        def objective(trial, X_train, y_train, X_val, y_val, input_dim, output_dim, class_weights):
             gate_hidden_units_options = {
                 "16": [16], 
                 "32": [32], 
@@ -57,11 +58,12 @@ class HyperparameterTuningFlow(FlowSpec):
                 expert_hidden_units=[32, 64, 32],
                 gate_hidden_units=chosen_gate_hidden_units,
                 num_active_experts=3,
-                dropout_rate=dropout_rate
+                dropout_rate=dropout_rate,
+                class_weights=class_weights
             )
             
-            logger = TensorBoardLogger("logs", name="MoE_experimental")
-            csv_logger = pl.loggers.CSVLogger("logs", name="MoE_experimental")
+            logger = TensorBoardLogger("logs", name="MoE_tensorboard")
+            csv_logger = pl.loggers.CSVLogger("logs", name="MoE_csv")
             lr_monitor = LearningRateMonitor(logging_interval='epoch')
 
             trainer = pl.Trainer(
@@ -89,13 +91,16 @@ class HyperparameterTuningFlow(FlowSpec):
         }
         study = optuna.create_study(direction="maximize")
         
-        study.optimize(lambda trial: objective(trial, self.X_train, self.y_train, self.X_test, self.y_test, self.input_dim, self.output_dim), 
+        study.optimize(lambda trial: objective(trial, self.X_train, self.y_train, 
+                                               self.X_test, self.y_test, self.input_dim, self.output_dim,
+                                               self.class_weights), 
                     n_trials=self.n_trials)
         
         print(f"Best Hyperparameters: {study.best_params}")
         
         best_params = study.best_params
         best_gate_hidden_units = gate_hidden_units_options[best_params['gate_hidden_units']]
+        
         
         best_model = MixtureOfExperts(
             input_dim=self.input_dim,
@@ -104,13 +109,14 @@ class HyperparameterTuningFlow(FlowSpec):
             expert_hidden_units=[32, 64, 32],
             gate_hidden_units=best_gate_hidden_units,
             num_active_experts=3,
-            dropout_rate=best_params['dropout_rate']
+            dropout_rate=best_params['dropout_rate'],
+            class_weights=self.class_weights
         )
         
         expert_usage_logger = ExpertUsageLogger(best_model)
 
-        logger = TensorBoardLogger("logs", name="MoE_tensorboard")
-        csv_logger = pl.loggers.CSVLogger("logs", name="MoE_csv")
+        logger = TensorBoardLogger("final_logs", name="MoE_tensorboard")
+        csv_logger = pl.loggers.CSVLogger("final_logs", name="MoE_csv")
         lr_monitor = LearningRateMonitor(logging_interval='epoch')
         checkpoint_callback = ModelCheckpoint(monitor='val_f2', mode='max') 
 
@@ -120,8 +126,10 @@ class HyperparameterTuningFlow(FlowSpec):
             callbacks=[lr_monitor, checkpoint_callback, expert_usage_logger],
         )
         
-        train_loader = DataLoader(TensorDataset(self.X_train, self.y_train), batch_size=4096, shuffle=True)
-        val_loader = DataLoader(TensorDataset(self.X_test, self.y_test), batch_size=4096)
+        train_loader = DataLoader(TensorDataset(torch.tensor(self.X_train.values, device='cuda'), 
+                                      torch.tensor(self.y_train, device='cuda')), batch_size=4096, shuffle=True)
+        val_loader = DataLoader(TensorDataset(torch.tensor(self.X_test.values, device='cuda'), 
+                                              torch.tensor(self.y_test, device='cuda')), batch_size=4096)
         
         trainer.fit(best_model, train_loader, val_loader)
         

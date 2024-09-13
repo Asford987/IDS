@@ -4,7 +4,7 @@ import numpy as np
 from scipy import stats
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OrdinalEncoder, StandardScaler
+from sklearn.preprocessing import LabelEncoder, OrdinalEncoder, StandardScaler
 import logging
 
 logging.getLogger('metaflow').setLevel(logging.WARNING)
@@ -12,11 +12,11 @@ logging.getLogger('metaflow').setLevel(logging.WARNING)
 class PreprocessingFlow(FlowSpec):
     
     outlier_threshold = Parameter('outlier_threshold', default=4)
-    correlation_threshold = Parameter('correlation_threshold', default=8.0)
+    correlation_threshold = Parameter('correlation_threshold', default=0.8)
     train_data_path = Parameter('train_data_path', default='CIC_IoMT_2024_WiFi_MQTT_train.parquet')
     test_data_path = Parameter('test_data_path', default='CIC_IoMT_2024_WiFi_MQTT_test.parquet')
     usage_ratio = Parameter('usage_ratio', default=0.2)
-    n_components = Parameter('n_components', default=15)
+    n_components = Parameter('n_components', default=20)
 
     @step
     def start(self):
@@ -78,16 +78,17 @@ class PreprocessingFlow(FlowSpec):
             filtered_dataframes.append(filtered_class_df_train)
             filtered_targets.append(filtered_class_target_train)
             
-            print(f'{len(outlier_mask)} data points removed for class {class_label}')
+            num_removed = np.sum(outlier_mask)
+            print(f'{num_removed} data points removed for class {class_label}')
+
         
         self.filtered_train = pd.concat(filtered_dataframes, axis=0)
-        self.fitlered_target_train = np.concatenate(filtered_targets)
+        self.filtered_target_train = np.concatenate(filtered_targets)
         
-        print(len(np.unique(self.fitlered_target_train)))
+        print(len(np.unique(self.filtered_target_train)))
         self.num_filtered_samples = len(self.filtered_train)
         
         self.next(self.normalization)
-
         
     @step
     def normalization(self):
@@ -98,8 +99,8 @@ class PreprocessingFlow(FlowSpec):
     
     @step
     def encode_labels(self):
-        self.encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
-        self.target_train = self.encoder.fit_transform(self.fitlered_target_train.reshape(-1, 1))
+        self.encoder = LabelEncoder()
+        self.target_train = self.encoder.fit_transform(self.filtered_target_train.reshape(-1, 1))
         self.target_test = self.encoder.transform(self.target_test.values.reshape(-1, 1))
         
         indices = np.where(self.target_test != -1)[0]
@@ -128,6 +129,15 @@ class PreprocessingFlow(FlowSpec):
         self.reduced_test = self.pca.transform(self.pruned_test)
         self.reduced_train = pd.DataFrame(self.reduced_train, columns=self.name_cols)
         self.reduced_test = pd.DataFrame(self.reduced_test, columns=self.name_cols)
+        self.next(self.compute_class_weights)
+        
+    @step
+    def compute_class_weights(self):
+        from sklearn.utils.class_weight import compute_class_weight
+        self.target_train = self.target_train.flatten()
+        self.target_test = self.target_test.flatten()
+        class_weights = compute_class_weight('balanced', classes=np.unique(self.target_train), y=self.target_train)
+        self.class_weights = class_weights
         self.next(self.save_artifacts)
         
     @step
@@ -137,8 +147,9 @@ class PreprocessingFlow(FlowSpec):
         if not os.path.exists('artifacts/clean_data'): os.makedirs('artifacts/clean_data')
         self.reduced_train.to_csv('artifacts/clean_data/X_train.csv', index=False)
         self.reduced_test.to_csv('artifacts/clean_data/X_test.csv', index=False)
-        np.save('artifacts/clean_data/y_train', self.target_train.astype(np.float32))
-        np.save('artifacts/clean_data/y_test', self.target_test.astype(np.float32))
+        np.save('artifacts/clean_data/y_train', self.target_train.astype(np.int64))
+        np.save('artifacts/clean_data/y_test', self.target_test.astype(np.int64))
+        np.save('artifacts/clean_data/class_weights', self.class_weights)
         self.next(self.end)
         
     @step
