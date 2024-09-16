@@ -11,13 +11,81 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 from sklearn.utils.class_weight import compute_class_weight
 
+import torch
+import torch
+
+class TemperatureScheduler(torch.optim.lr_scheduler.ReduceLROnPlateau):
+    def __init__(self, optimizer, mode='max', patience=5, increase_factor=1.1, increase_duration=5,
+                 min_lr=1e-6, max_lr=1.0, verbose=False):
+        # Initialize the parent class with factor=1.0 to prevent automatic LR reduction
+        super().__init__(optimizer, mode=mode, patience=patience, factor=0.9, min_lr=min_lr, verbose=verbose)
+        self.patience = patience
+        self.increase_factor = increase_factor
+        self.duration = increase_duration
+        self.min_lr = min_lr
+        self.max_lr = max_lr
+        self.verbose = verbose
+        self.wait = 0
+        self.prev_metric = None
+        self.increased_lr = False
+        self.increase_counter = 0
+        self.original_lrs = [group['lr'] for group in optimizer.param_groups]
+
+    def step(self, metrics, epoch=None):
+        current_metric = float(metrics)
+        
+        if self.prev_metric is None:
+            # First epoch
+            self.prev_metric = current_metric
+            self.wait = 0
+        else:
+            if current_metric > self.prev_metric + 1e-8:
+                # Improvement observed
+                self.prev_metric = current_metric
+                self.wait = 0
+            else:
+                # No improvement
+                self.wait += 1
+
+            if self.increased_lr:
+                self.increase_counter += 1
+                if self.increase_counter >= self.duration:
+                    # Reset learning rate after duration
+                    self._reset_lr(epoch)
+                    self.increased_lr = False
+                    self.increase_counter = 0
+            elif self.wait >= self.patience:
+                # Increase learning rate
+                self._increase_lr(epoch)
+                self.increased_lr = True
+                self.increase_counter = 0
+                self.wait = 0  # Reset wait after increasing LR
+
+    def _increase_lr(self, epoch):
+        for i, param_group in enumerate(self.optimizer.param_groups):
+            old_lr = param_group['lr']
+            new_lr = min(old_lr * self.increase_factor, self.max_lr)
+            param_group['lr'] = new_lr
+            if self.verbose:
+                print(f'Epoch {epoch}: increasing learning rate of group {i} to {new_lr:.4e}.')
+
+    def _reset_lr(self, epoch):
+        for i, param_group in enumerate(self.optimizer.param_groups):
+            new_lr = self.original_lrs[i]
+            param_group['lr'] = new_lr
+            if self.verbose:
+                print(f'Epoch {epoch}: resetting learning rate of group {i} to {new_lr:.4e}.')
+
+
+
 class ExpertModel(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_units, dropout_rate):
         super(ExpertModel, self).__init__()
         layers = []
         for units in hidden_units:
+            layers.append(nn.BatchNorm1d(input_dim))
             layers.append(nn.Linear(input_dim, units))
-            layers.append(nn.ReLU())
+            layers.append(nn.LeakyReLU())
             layers.append(nn.Dropout(dropout_rate))
             input_dim = units
         layers.append(nn.Linear(input_dim, output_dim))
@@ -31,8 +99,9 @@ class GateModel(nn.Module):
         super(GateModel, self).__init__()
         layers = []
         for units in hidden_units:
+            layers.append(nn.BatchNorm1d(input_dim))
             layers.append(nn.Linear(input_dim, units))
-            layers.append(nn.ReLU())
+            layers.append(nn.LeakyReLU())
             layers.append(nn.Dropout(dropout_rate))
             input_dim = units
         layers.append(nn.Linear(input_dim, num_experts))
@@ -45,7 +114,7 @@ class GateModel(nn.Module):
 class MixtureOfExperts(pl.LightningModule):
     def __init__(self, input_dim, output_dim, num_experts, expert_hidden_units, 
                  gate_hidden_units, num_active_experts, dropout_rate, 
-                 learning_rate=1e-2, class_weights=None):
+                 learning_rate=1e-1, class_weights=None):
         super(MixtureOfExperts, self).__init__()
         self.save_hyperparameters()
 
@@ -59,12 +128,11 @@ class MixtureOfExperts(pl.LightningModule):
         self.criterion = nn.CrossEntropyLoss(self.class_weights.to(self.device))
 
     def forward(self, x):
-        gating_weights = self.gate(x)
-        topk_weights, topk_indices = torch.topk(gating_weights, self.top_k, dim=-1)
-        gating_mask = torch.zeros_like(gating_weights).scatter_(-1, topk_indices, topk_weights)
-        expert_outputs = torch.stack([expert(x) for expert in self.experts], dim=-1)
-        output = torch.sum(expert_outputs * gating_mask.unsqueeze(2), dim=-1)
-        return output
+        gating_weights = self.gate(x)  # [batch_size, num_experts]
+        expert_outputs = torch.stack([expert(x) for expert in self.experts], dim=-1)  # [batch_size, output_dim, num_experts]
+        output = torch.sum(expert_outputs * gating_weights.unsqueeze(2), dim=-1)  # [batch_size, output_dim]
+        return output, gating_weights, expert_outputs
+
 
     def get_expert_activations(self, x):
         expert_outputs = torch.stack([expert(x) for expert in self.experts], dim=1)
@@ -75,27 +143,53 @@ class MixtureOfExperts(pl.LightningModule):
         torch.cuda.empty_cache()
         self.expert_usage_count = self.expert_usage_count.to(self.device)
         
-    def on_train_epoch_start(self) -> None:
-        self.criterion = nn.CrossEntropyLoss(self.class_weights.to(self.device))
-        
     def training_step(self, batch, batch_idx):
         x, y = batch
-        y_hat = self(x)
-        loss = self.criterion(y_hat, y)
-        self.log('train_loss', loss, logger=True, prog_bar=True)
-        return loss
+        y = y.long().squeeze()
+        outputs, _, expert_outputs = self(x)
+        preds = torch.argmax(outputs, dim=1)
+        # Collect predictions and targets
+        self.train_preds.append(preds.detach().cpu())
+        self.train_targets.append(y.detach().cpu())
+        # Compute the loss
+        total_loss, ce_loss, similarity_loss = self.criterion(outputs, y, expert_outputs)
+        # Log losses
+        self.log('train_loss', total_loss, logger=True, prog_bar=True)
+        self.log('ce_loss', ce_loss, logger=True)
+        self.log('similarity_loss', similarity_loss, logger=True)
+        return total_loss
+
+    def on_train_epoch_start(self):
+        self.train_preds = []
+        self.train_targets = []
+
+    def on_train_epoch_end(self):
+        preds = torch.cat(self.train_preds)
+        targets = torch.cat(self.train_targets)
+        f2_score_macro = fbeta_score(targets.numpy(), preds.numpy(), beta=2, average='macro')
+        prec = precision_score(targets.numpy(), preds.numpy(), average='macro', zero_division=1)
+        recall = recall_score(targets.numpy(), preds.numpy(), average='macro', zero_division=1)
+        # Log metrics
+        self.log('train_precision', prec, logger=True)
+        self.log('train_recall', recall, logger=True)
+        self.log('train_f2', f2_score_macro, prog_bar=True, logger=True)
+        # Clear lists
+        self.train_preds = []
+        self.train_targets = []
+
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         with torch.no_grad():
-            y_hat = self(x)
+            y_hat, _, experts_outputs = self(x)
         preds = torch.argmax(y_hat, dim=1)
         self.val_preds.append(preds.cpu())
         self.val_targets.append(y.cpu())
 
-        loss = self.criterion(y_hat, y)
-        self.log('val_loss', loss, logger=True, prog_bar=True)
-        return loss
+        total_loss, _, similarity_loss = self.criterion(y_hat, y, experts_outputs)
+        self.log('val_total_loss', total_loss, logger=True, prog_bar=True)
+        self.log('val_similarity_loss', similarity_loss, logger=True)
+        return total_loss
 
     def on_validation_epoch_start(self):
         self.val_preds = []
@@ -119,20 +213,33 @@ class MixtureOfExperts(pl.LightningModule):
         self.log('val_f2', f2_score_macro, prog_bar=True, logger=True)
     
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='max', factor=0.5, patience=5, verbose=True, min_lr=1e-6
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate, weight_decay=1e-2)
+        scheduler1 = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='max', factor=0.8, patience=5, verbose=True, min_lr=1e-6
         )
         
-        return {
-            'optimizer': optimizer,
-            'lr_scheduler': {
+        scheduler = TemperatureScheduler(optimizer, mode='max', patience=5, increase_factor=2.5,
+                                         increase_duration=5, min_lr=1e-6, max_lr=1.0)
+        schedulers = [
+            {
+                'scheduler': scheduler1,
+                'monitor': 'val_f2',
+                'reduce_on_plateau': True,
+                'interval': 'epoch',
+                'frequency': 1,
+                'name': 'ReduceLROnPlateau'
+            },
+            {
                 'scheduler': scheduler,
                 'monitor': 'val_f2',
+                'reduce_on_plateau': True,
                 'interval': 'epoch',
-                'frequency': 1
+                'frequency': 1,
+                'name': 'CustomLRScheduler'
             }
-        }
+        ]
+
+        return [optimizer], schedulers
                     
 
 class ExpertUsageLogger(pl.Callback):
