@@ -107,6 +107,7 @@ class PreprocessingFlow(FlowSpec):
         self.target_test = self.target_test[indices]
         self.normalized_test = self.normalized_test[indices]
         print(len(np.unique(self.target_train)), len(np.unique(self.target_test)))
+        self.encoding_dict = dict(zip(self.encoder.classes_, self.encoder.transform(self.encoder.classes_)))
         self.next(self.feature_correlation_filtering)
 
     @step
@@ -143,6 +144,7 @@ class PreprocessingFlow(FlowSpec):
     @step
     def save_artifacts(self):
         import os, numpy as np
+        import joblib
         if not os.path.exists('artifacts'): os.makedirs('artifacts')
         if not os.path.exists('artifacts/clean_data'): os.makedirs('artifacts/clean_data')
         self.reduced_train.to_csv('artifacts/clean_data/X_train.csv', index=False)
@@ -150,6 +152,7 @@ class PreprocessingFlow(FlowSpec):
         np.save('artifacts/clean_data/y_train', self.target_train.astype(np.int64))
         np.save('artifacts/clean_data/y_test', self.target_test.astype(np.int64))
         np.save('artifacts/clean_data/class_weights', self.class_weights)
+        joblib.dump(self.encoding_dict, 'artifacts/clean_data/encoding_dict.joblib')
         self.next(self.end)
         
     @step

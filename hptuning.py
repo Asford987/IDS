@@ -51,7 +51,7 @@ class HyperparameterTuningFlow(FlowSpec):
             chosen_gate_hidden_units = gate_hidden_units_options[chosen_gate_hidden_units_str]
 
             dropout_rate = trial.suggest_float('dropout_rate', 0.0, 0.5)
-            model = MixtureOfExperts(
+            model = MoE(
                 input_dim=input_dim,
                 output_dim=output_dim,
                 num_experts=len(np.unique(y_train)),
@@ -102,7 +102,7 @@ class HyperparameterTuningFlow(FlowSpec):
         best_gate_hidden_units = gate_hidden_units_options[best_params['gate_hidden_units']]
         
         
-        best_model = MixtureOfExperts(
+        best_model = MoE(
             input_dim=self.input_dim,
             output_dim=self.output_dim,
             num_experts=len(np.unique(self.y_train)), 
@@ -113,8 +113,6 @@ class HyperparameterTuningFlow(FlowSpec):
             class_weights=self.class_weights
         )
         
-        expert_usage_logger = ExpertUsageLogger(best_model)
-
         logger = TensorBoardLogger("final_logs", name="MoE_tensorboard")
         csv_logger = pl.loggers.CSVLogger("final_logs", name="MoE_csv")
         lr_monitor = LearningRateMonitor(logging_interval='epoch')
@@ -123,7 +121,7 @@ class HyperparameterTuningFlow(FlowSpec):
         trainer = pl.Trainer(
             max_epochs=300,
             logger=[logger, csv_logger],
-            callbacks=[lr_monitor, checkpoint_callback, expert_usage_logger],
+            callbacks=[lr_monitor, checkpoint_callback],
         )
         
         train_loader = DataLoader(TensorDataset(torch.tensor(self.X_train.values, device='cuda'), 
@@ -132,8 +130,6 @@ class HyperparameterTuningFlow(FlowSpec):
                                               torch.tensor(self.y_test, device='cuda')), batch_size=4096)
         
         trainer.fit(best_model, train_loader, val_loader)
-        
-        expert_usage_logger.plot_expert_usage()
         
         self.best_model, self.study = best_model, study
         self.next(self.analyze_best_model_results)
