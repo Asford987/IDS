@@ -4,3 +4,4 @@ CIC_IoMT_*
 __pycache__
 artifacts
 *.ckpt
+data

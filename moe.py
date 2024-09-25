@@ -29,69 +29,6 @@ class WarmupScheduler(torch.optim.lr_scheduler.LRScheduler):
             # After warmup, return the learning rate according to the optimizer's initial values
             return [self.prev_lr for _ in self.optimizer.param_groups]
 
-class TemperatureScheduler(torch.optim.lr_scheduler.ReduceLROnPlateau):
-    def __init__(self, optimizer, mode='max', patience=5, increase_factor=1.1, increase_duration=5,
-                 min_lr=1e-6, max_lr=1.0, verbose=False):
-        # Initialize the parent class with factor=1.0 to prevent automatic LR reduction
-        super().__init__(optimizer, mode=mode, patience=patience, factor=0.9, min_lr=min_lr, verbose=verbose)
-        self.patience = patience
-        self.increase_factor = increase_factor
-        self.duration = increase_duration
-        self.min_lr = min_lr
-        self.max_lr = max_lr
-        self.verbose = verbose
-        self.wait = 0
-        self.prev_metric = None
-        self.increased_lr = False
-        self.increase_counter = 0
-        self.original_lrs = [group['lr'] for group in optimizer.param_groups]
-
-    def step(self, metrics=None, epoch=None):
-        current_metric = float(metrics)
-        
-        if self.prev_metric is None:
-            # First epoch
-            self.prev_metric = current_metric
-            self.wait = 0
-        else:
-            if current_metric > self.prev_metric + 1e-8:
-                # Improvement observed
-                self.prev_metric = current_metric
-                self.wait = 0
-            else:
-                # No improvement
-                self.wait += 1
-
-            if self.increased_lr:
-                self.increase_counter += 1
-                if self.increase_counter >= self.duration:
-                    # Reset learning rate after duration
-                    self._reset_lr(epoch)
-                    self.increased_lr = False
-                    self.increase_counter = 0
-            elif self.wait >= self.patience:
-                # Increase learning rate
-                self._increase_lr(epoch)
-                self.increased_lr = True
-                self.increase_counter = 0
-                self.wait = 0  # Reset wait after increasing LR
-
-    def _increase_lr(self, epoch):
-        for i, param_group in enumerate(self.optimizer.param_groups):
-            old_lr = param_group['lr']
-            new_lr = min(old_lr * self.increase_factor, self.max_lr)
-            param_group['lr'] = new_lr
-            if self.verbose:
-                print(f'Epoch {epoch}: increasing learning rate of group {i} to {new_lr:.4e}.')
-
-    def _reset_lr(self, epoch):
-        for i, param_group in enumerate(self.optimizer.param_groups):
-            new_lr = self.original_lrs[i]
-            param_group['lr'] = new_lr
-            if self.verbose:
-                print(f'Epoch {epoch}: resetting learning rate of group {i} to {new_lr:.4e}.')
-
-
 
 class ExpertModel(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_units, dropout_rate):
@@ -110,7 +47,7 @@ class ExpertModel(nn.Module):
         return self.model(x)
 
 class GateModel(pl.LightningModule):
-    def __init__(self, input_dim, num_experts, hidden_units, dropout_rate, class_weights, learning_rate=1e-2):
+    def __init__(self, input_dim, num_experts, hidden_units, dropout_rate, class_weights, learning_rate=1e-3):
         super(GateModel, self).__init__()
         self.input_dim = input_dim
         layers = []
@@ -126,6 +63,13 @@ class GateModel(pl.LightningModule):
         self.learning_rate = learning_rate
         self.class_weights = torch.tensor(class_weights, dtype=torch.float32) if class_weights is not None else torch.ones(self.num_classes)
         self.criterion = nn.CrossEntropyLoss(self.class_weights)
+        self.initialize_weights()
+
+    def initialize_weights(self):
+        for layer in self.model:
+            if isinstance(layer, nn.Linear):
+                nn.init.xavier_uniform_(layer.weight)
+                nn.init.zeros_(layer.bias)
 
     def forward(self, x):
         return F.softmax(self.model(x), dim=1)
@@ -161,12 +105,11 @@ class GateModel(pl.LightningModule):
         f2_score_macro = fbeta_score(targets.numpy(), preds.numpy(), beta=2, average='macro')
         prec = precision_score(targets.numpy(), preds.numpy(), average='macro')
         recall = recall_score(targets.numpy(), preds.numpy(), average='macro')
-
-        # Compute per-class F2 scores
         f2_scores = fbeta_score(targets.numpy(), preds.numpy(), beta=2, average=None, zero_division=1)
         f2_scores = torch.tensor(f2_scores, dtype=torch.float32).to(self.device)
+        for class_idx, f2_score in enumerate(f2_scores):
+            self.log(f'val_f2_class_{class_idx}', f2_score, logger=True, prog_bar=False)
 
-        # Log metrics
         self.log('val_precision', prec, logger=True)
         self.log('val_recall', recall, logger=True)
         self.log('val_f2', f2_score_macro, prog_bar=True, logger=True)
@@ -174,10 +117,10 @@ class GateModel(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate, weight_decay=1e-2)
         scheduler1 = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='max', factor=0.8, patience=10, verbose=True, min_lr=1e-6
+            optimizer, mode='max', factor=0.8, patience=5, verbose=True, min_lr=1e-6
         )
         
-        scheduler = WarmupScheduler(optimizer, warmup_epochs=5, fixed_lr=1e-1, prev_lr=self.learning_rate)
+        scheduler = WarmupScheduler(optimizer, warmup_epochs=5, fixed_lr=1e-2, prev_lr=self.learning_rate)
         
         schedulers = [
             {
@@ -200,7 +143,7 @@ class GateModel(pl.LightningModule):
     
 
 class MoE(pl.LightningModule):
-    def __init__(self, gate_model: GateModel, num_expert_models, expert_hidden_units, learning_rate=5e-3, dropout_rate=0.2, class_weights=None):
+    def __init__(self, gate_model: GateModel, num_expert_models, expert_hidden_units, learning_rate=1e-3, dropout_rate=0.2, class_weights=None):
         super(MoE, self).__init__()
         self.save_hyperparameters()
 
@@ -225,10 +168,6 @@ class MoE(pl.LightningModule):
         loss = torch.norm(weighted_utilization - ideal_utilization)
         return loss
 
-
-    def on_fit_start(self):
-        torch.cuda.empty_cache()
-        
     def training_step(self, batch, batch_idx):
         x, y = batch
         y = y.long().squeeze()
@@ -298,10 +237,10 @@ class MoE(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate, weight_decay=1e-2)
         scheduler1 = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='max', factor=0.8, patience=10, verbose=True, min_lr=1e-6
+            optimizer, mode='max', factor=0.8, patience=5, verbose=True, min_lr=1e-6
         )
         
-        scheduler = WarmupScheduler(optimizer, warmup_epochs=5, fixed_lr=1e-1, prev_lr=self.learning_rate)
+        scheduler = WarmupScheduler(optimizer, warmup_epochs=5, fixed_lr=1e-2, prev_lr=self.learning_rate)
         
         schedulers = [
             {

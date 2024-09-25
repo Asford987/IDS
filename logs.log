@@ -1,0 +1,746 @@
+2024-09-25 14:47:33,877:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2024-09-25 14:47:33,877:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2024-09-25 14:47:33,877:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2024-09-25 14:47:33,877:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2024-09-25 14:47:41,911:INFO:PyCaret ClassificationExperiment
+2024-09-25 14:47:41,911:INFO:Logging name: clf-default-name
+2024-09-25 14:47:41,911:INFO:ML Usecase: MLUsecase.CLASSIFICATION
+2024-09-25 14:47:41,911:INFO:version 3.3.2
+2024-09-25 14:47:41,911:INFO:Initializing setup()
+2024-09-25 14:47:41,911:INFO:self.USI: b17a
+2024-09-25 14:47:41,911:INFO:self._variable_keys: {'USI', 'pipeline', '_ml_usecase', 'is_multiclass', 'logging_param', 'exp_id', 'X_test', 'target_param', 'fold_groups_param', 'log_plots_param', 'X_train', 'y_test', 'idx', 'exp_name_log', 'y', 'html_param', 'seed', 'y_train', 'X', 'fold_shuffle_param', '_available_plots', 'data', 'n_jobs_param', 'fix_imbalance', 'fold_generator', 'memory', 'gpu_param', 'gpu_n_jobs_param'}
+2024-09-25 14:47:41,911:INFO:Checking environment
+2024-09-25 14:47:41,911:INFO:python_version: 3.11.9
+2024-09-25 14:47:41,911:INFO:python_build: ('main', 'Apr 10 2024 13:16:36')
+2024-09-25 14:47:41,911:INFO:machine: x86_64
+2024-09-25 14:47:41,911:INFO:platform: Linux-6.8.11-amd64-x86_64-with-glibc2.38
+2024-09-25 14:47:41,911:INFO:Memory: svmem(total=16542109696, available=9302085632, percent=43.8, used=5975355392, free=5098323968, active=7489220608, inactive=2617958400, buffers=269905920, cached=5198524416, shared=911454208, slab=478830592)
+2024-09-25 14:47:41,911:INFO:Physical Core: 8
+2024-09-25 14:47:41,912:INFO:Logical Core: 16
+2024-09-25 14:47:41,912:INFO:Checking libraries
+2024-09-25 14:47:41,912:INFO:System:
+2024-09-25 14:47:41,912:INFO:    python: 3.11.9 (main, Apr 10 2024, 13:16:36) [GCC 13.2.0]
+2024-09-25 14:47:41,912:INFO:executable: /home/fabricio/Projects/mpc/env/bin/python
+2024-09-25 14:47:41,912:INFO:   machine: Linux-6.8.11-amd64-x86_64-with-glibc2.38
+2024-09-25 14:47:41,912:INFO:PyCaret required dependencies:
+2024-09-25 14:47:42,425:INFO:                 pip: 24.1.1
+2024-09-25 14:47:42,425:INFO:          setuptools: 68.1.2
+2024-09-25 14:47:42,425:INFO:             pycaret: 3.3.2
+2024-09-25 14:47:42,425:INFO:             IPython: 8.26.0
+2024-09-25 14:47:42,425:INFO:          ipywidgets: 8.1.5
+2024-09-25 14:47:42,425:INFO:                tqdm: 4.66.5
+2024-09-25 14:47:42,425:INFO:               numpy: 1.26.4
+2024-09-25 14:47:42,425:INFO:              pandas: 2.1.4
+2024-09-25 14:47:42,425:INFO:              jinja2: 3.1.4
+2024-09-25 14:47:42,425:INFO:               scipy: 1.11.4
+2024-09-25 14:47:42,425:INFO:              joblib: 1.3.2
+2024-09-25 14:47:42,425:INFO:             sklearn: 1.4.2
+2024-09-25 14:47:42,425:INFO:                pyod: 2.0.2
+2024-09-25 14:47:42,425:INFO:            imblearn: 0.12.3
+2024-09-25 14:47:42,425:INFO:   category_encoders: 2.6.3
+2024-09-25 14:47:42,425:INFO:            lightgbm: 4.5.0
+2024-09-25 14:47:42,425:INFO:               numba: 0.60.0
+2024-09-25 14:47:42,425:INFO:            requests: 2.32.3
+2024-09-25 14:47:42,425:INFO:          matplotlib: 3.7.5
+2024-09-25 14:47:42,425:INFO:          scikitplot: 0.3.7
+2024-09-25 14:47:42,425:INFO:         yellowbrick: 1.5
+2024-09-25 14:47:42,425:INFO:              plotly: 5.24.1
+2024-09-25 14:47:42,425:INFO:    plotly-resampler: Not installed
+2024-09-25 14:47:42,425:INFO:             kaleido: 0.2.1
+2024-09-25 14:47:42,425:INFO:           schemdraw: 0.15
+2024-09-25 14:47:42,425:INFO:         statsmodels: 0.14.3
+2024-09-25 14:47:42,425:INFO:              sktime: 0.26.0
+2024-09-25 14:47:42,425:INFO:               tbats: 1.1.3
+2024-09-25 14:47:42,425:INFO:            pmdarima: 2.0.4
+2024-09-25 14:47:42,425:INFO:              psutil: 6.0.0
+2024-09-25 14:47:42,425:INFO:          markupsafe: 2.1.5
+2024-09-25 14:47:42,425:INFO:             pickle5: Not installed
+2024-09-25 14:47:42,425:INFO:         cloudpickle: 3.0.0
+2024-09-25 14:47:42,425:INFO:         deprecation: 2.1.0
+2024-09-25 14:47:42,425:INFO:              xxhash: 3.5.0
+2024-09-25 14:47:42,425:INFO:           wurlitzer: 3.1.1
+2024-09-25 14:47:42,425:INFO:PyCaret optional dependencies:
+2024-09-25 14:47:42,436:INFO:                shap: Not installed
+2024-09-25 14:47:42,436:INFO:           interpret: Not installed
+2024-09-25 14:47:42,436:INFO:                umap: Not installed
+2024-09-25 14:47:42,436:INFO:     ydata_profiling: Not installed
+2024-09-25 14:47:42,436:INFO:  explainerdashboard: Not installed
+2024-09-25 14:47:42,436:INFO:             autoviz: Not installed
+2024-09-25 14:47:42,436:INFO:           fairlearn: Not installed
+2024-09-25 14:47:42,436:INFO:          deepchecks: Not installed
+2024-09-25 14:47:42,437:INFO:             xgboost: Not installed
+2024-09-25 14:47:42,437:INFO:            catboost: Not installed
+2024-09-25 14:47:42,437:INFO:              kmodes: Not installed
+2024-09-25 14:47:42,437:INFO:             mlxtend: Not installed
+2024-09-25 14:47:42,437:INFO:       statsforecast: Not installed
+2024-09-25 14:47:42,437:INFO:        tune_sklearn: Not installed
+2024-09-25 14:47:42,437:INFO:                 ray: Not installed
+2024-09-25 14:47:42,437:INFO:            hyperopt: Not installed
+2024-09-25 14:47:42,437:INFO:              optuna: 3.6.1
+2024-09-25 14:47:42,437:INFO:               skopt: Not installed
+2024-09-25 14:47:42,437:INFO:              mlflow: Not installed
+2024-09-25 14:47:42,437:INFO:              gradio: Not installed
+2024-09-25 14:47:42,437:INFO:             fastapi: Not installed
+2024-09-25 14:47:42,437:INFO:             uvicorn: Not installed
+2024-09-25 14:47:42,437:INFO:              m2cgen: Not installed
+2024-09-25 14:47:42,437:INFO:           evidently: Not installed
+2024-09-25 14:47:42,437:INFO:               fugue: Not installed
+2024-09-25 14:47:42,437:INFO:           streamlit: Not installed
+2024-09-25 14:47:42,437:INFO:             prophet: Not installed
+2024-09-25 14:47:42,437:INFO:None
+2024-09-25 14:47:42,437:INFO:Set up data.
+2024-09-25 14:47:43,190:INFO:Set up folding strategy.
+2024-09-25 14:47:43,190:INFO:Set up train/test split.
+2024-09-25 14:47:43,190:INFO:Set up data.
+2024-09-25 14:47:44,356:INFO:Set up index.
+2024-09-25 14:47:44,625:INFO:Assigning column types.
+2024-09-25 14:47:45,126:INFO:Engine successfully changes for model 'lr' to 'sklearn'.
+2024-09-25 14:47:45,154:INFO:Engine for model 'knn' has not been set explicitly, hence returning None.
+2024-09-25 14:47:45,165:INFO:Engine for model 'rbfsvm' has not been set explicitly, hence returning None.
+2024-09-25 14:47:45,185:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,186:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,214:INFO:Engine for model 'knn' has not been set explicitly, hence returning None.
+2024-09-25 14:47:45,215:INFO:Engine for model 'rbfsvm' has not been set explicitly, hence returning None.
+2024-09-25 14:47:45,232:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,233:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,233:INFO:Engine successfully changes for model 'knn' to 'sklearn'.
+2024-09-25 14:47:45,262:INFO:Engine for model 'rbfsvm' has not been set explicitly, hence returning None.
+2024-09-25 14:47:45,280:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,280:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,310:INFO:Engine for model 'rbfsvm' has not been set explicitly, hence returning None.
+2024-09-25 14:47:45,327:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,328:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,328:INFO:Engine successfully changes for model 'rbfsvm' to 'sklearn'.
+2024-09-25 14:47:45,374:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,375:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,421:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,421:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:45,422:INFO:Preparing preprocessing pipeline...
+2024-09-25 14:47:45,513:INFO:Set up label encoding.
+2024-09-25 14:47:45,514:INFO:Set up simple imputation.
+2024-09-25 14:47:45,590:INFO:Set up column name cleaning.
+2024-09-25 14:47:46,928:INFO:Finished creating preprocessing pipeline.
+2024-09-25 14:47:46,931:INFO:Pipeline: Pipeline(memory=FastMemory(location=/tmp/joblib),
+         steps=[('label_encoding',
+                 TransformerWrapperWithInverse(exclude=None, include=None,
+                                               transformer=LabelEncoder())),
+                ('numerical_imputer',
+                 TransformerWrapper(exclude=None,
+                                    include=['Header_Length', 'Protocol Type',
+                                             'Duration', 'Rate', 'Srate',
+                                             'Drate', 'fin_flag_number',
+                                             'syn_flag_number',
+                                             'rst_flag_number',
+                                             'psh_flag_...
+                ('categorical_imputer',
+                 TransformerWrapper(exclude=None, include=[],
+                                    transformer=SimpleImputer(add_indicator=False,
+                                                              copy=True,
+                                                              fill_value=None,
+                                                              keep_empty_features=False,
+                                                              missing_values=nan,
+                                                              strategy='most_frequent'))),
+                ('clean_column_names',
+                 TransformerWrapper(exclude=None, include=None,
+                                    transformer=CleanColumnNames(match='[\\]\\[\\,\\{\\}\\"\\:]+')))],
+         verbose=False)
+2024-09-25 14:47:46,931:INFO:Creating final display dataframe.
+2024-09-25 14:47:50,812:INFO:Setup _display_container:                     Description  \
+0                    Session id   
+1                        Target   
+2                   Target type   
+3                Target mapping   
+4           Original data shape   
+5        Transformed data shape   
+6   Transformed train set shape   
+7    Transformed test set shape   
+8              Numeric features   
+9                    Preprocess   
+10              Imputation type   
+11           Numeric imputation   
+12       Categorical imputation   
+13               Fold Generator   
+14                  Fold Number   
+15                     CPU Jobs   
+16                      Use GPU   
+17               Log Experiment   
+18              Experiment Name   
+19                          USI   
+
+                                                Value  
+0                                                1234  
+1                                               label  
+2                                          Multiclass  
+3   DDoS: 0, DoS: 1, MQTT: 2, benign: 3, recon: 4,...  
+4                                       (2688306, 46)  
+5                                       (2688306, 46)  
+6                                       (1074124, 46)  
+7                                       (1614182, 46)  
+8                                                  45  
+9                                                True  
+10                                             simple  
+11                                               mean  
+12                                               mode  
+13                                    StratifiedKFold  
+14                                                 10  
+15                                                 -1  
+16                                              False  
+17                                              False  
+18                                   clf-default-name  
+19                                               b17a  
+2024-09-25 14:47:50,867:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:50,867:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:50,919:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:50,920:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:47:50,922:INFO:setup() successfully completed in 9.01s...............
+2024-09-25 14:47:50,930:INFO:Initializing get_config()
+2024-09-25 14:47:50,930:INFO:get_config(self=<pycaret.classification.oop.ClassificationExperiment object at 0x7fb9c74dbf50>, variable=X_train_transformed)
+2024-09-25 14:47:51,383:INFO:Variable: X_train returned as          Header_Length  Protocol Type  Duration           Rate          Srate  \
+0             0.000000       1.000000      64.0       2.487578       2.487578   
+1             0.000000       1.000000      64.0  118149.406250  118149.406250   
+2         11251.000000      17.000000      64.0   70580.492188   70580.492188   
+3         30959.000000      17.000000      64.0   25272.154297   25272.154297   
+4             0.000000       1.000000      64.0   23237.140625   23237.140625   
+...                ...            ...       ...            ...            ...   
+1074119       0.000000       1.000000      64.0     169.408173     169.408173   
+1074120     711.169983       1.160156      64.0     153.781906     153.781906   
+1074121       0.000000       1.000000      64.0     147.525757     147.525757   
+1074122   44725.000000      17.000000      64.0   25088.234375   25088.234375   
+1074123     108.040001       6.000000      64.0       0.522522       0.522522   
+
+         Drate  fin_flag_number  syn_flag_number  rst_flag_number  \
+0          0.0              0.0              0.0              0.0   
+1          0.0              0.0              0.0              0.0   
+2          0.0              0.0              0.0              0.0   
+3          0.0              0.0              0.0              0.0   
+4          0.0              0.0              0.0              0.0   
+...        ...              ...              ...              ...   
+1074119    0.0              0.0              0.0              0.0   
+1074120    0.0              0.0              0.0              0.0   
+1074121    0.0              0.0              0.0              0.0   
+1074122    0.0              0.0              0.0              0.0   
+1074123    0.0              0.0              1.0              0.0   
+
+         psh_flag_number  ...       AVG       Std  Tot size         IAT  \
+0                    0.0  ...  42.00000  0.000000  42.00000  84696992.0   
+1                    0.0  ...  42.00000  0.000000  42.00000  84697064.0   
+2                    0.0  ...  50.00000  0.000000  50.00000  84696760.0   
+3                    0.0  ...  50.00000  0.000000  50.00000  84696600.0   
+4                    0.0  ...  42.00000  0.000000  42.00000  84696992.0   
+...                  ...  ...       ...       ...       ...         ...   
+1074119              0.0  ...  42.00000  0.000000  42.00000  84697032.0   
+1074120              0.0  ...  43.21875  4.523438  43.81250  84697008.0   
+1074121              0.0  ...  42.00000  0.000000  42.00000  84697032.0   
+1074122              0.0  ...  50.00000  0.000000  50.00000  84678856.0   
+1074123              0.0  ...  54.00000  0.045898  54.03125  84674656.0   
+
+         Number   Magnitue    Radius  Covariance  Variance  Weight  
+0           9.5   9.164062  0.000000    0.000000  0.000000   141.5  
+1           9.5   9.164062  0.000000    0.000000  0.000000   141.5  
+2           9.5  10.000000  0.000000    0.000000  0.000000   141.5  
+3           9.5  10.000000  0.000000    0.000000  0.000000   141.5  
+4           9.5   9.164062  0.000000    0.000000  0.000000   141.5  
+...         ...        ...       ...         ...       ...     ...  
+1074119     9.5   9.164062  0.000000    0.000000  0.000000   141.5  
+1074120     9.5   9.289062  6.410156  206.938019  0.099976   141.5  
+1074121     9.5   9.164062  0.000000    0.000000  0.000000   141.5  
+1074122     9.5  10.000000  0.000000    0.000000  0.000000   141.5  
+1074123     9.5  10.390625  0.065247    0.042584  0.049988   141.5  
+
+[1074124 rows x 45 columns]
+2024-09-25 14:47:51,383:INFO:get_config() successfully completed......................................
+2024-09-25 14:47:51,384:INFO:Initializing get_config()
+2024-09-25 14:47:51,384:INFO:get_config(self=<pycaret.classification.oop.ClassificationExperiment object at 0x7fb9c74dbf50>, variable=y_train_transformed)
+2024-09-25 14:47:51,787:INFO:Variable: y_train returned as 0          0
+1          0
+2          0
+3          0
+4          0
+          ..
+1074119    0
+1074120    0
+1074121    0
+1074122    1
+1074123    1
+Name: label, Length: 1074124, dtype: int64
+2024-09-25 14:47:51,787:INFO:get_config() successfully completed......................................
+2024-09-25 14:47:51,789:INFO:Initializing get_config()
+2024-09-25 14:47:51,789:INFO:get_config(self=<pycaret.classification.oop.ClassificationExperiment object at 0x7fb9c74dbf50>, variable=X_test_transformed)
+2024-09-25 14:47:52,399:INFO:Variable: X_test returned as          Header_Length  Protocol Type  Duration           Rate          Srate  \
+1074124    2525.000000       17.00000   64.0000  190424.250000  190424.250000   
+1074125    7525.000000       17.00000   64.0000   30811.365234   30811.365234   
+1074126    7659.500000       17.00000   64.0000  130358.820312  130358.820312   
+1074127    4375.000000       17.00000   64.0000   22628.230469   22628.230469   
+1074128    9375.000000       17.00000   64.0000   21570.292969   21570.292969   
+...                ...            ...       ...            ...            ...   
+2688301    3249.300049        6.21875   65.9375      13.629925      13.629925   
+2688302     679.840027        6.00000   64.0000       2.697452       2.697452   
+2688303     667.820007        6.00000   64.0000       5.641158       5.641158   
+2688304     832.020020        6.00000   64.0000       8.737793       8.737793   
+2688305     462.171417        6.00000   64.0000       3.469970       3.469970   
+
+         Drate  fin_flag_number  syn_flag_number  rst_flag_number  \
+1074124    0.0         0.000000         0.000000         0.000000   
+1074125    0.0         0.000000         0.000000         0.000000   
+1074126    0.0         0.000000         0.000000         0.000000   
+1074127    0.0         0.000000         0.000000         0.000000   
+1074128    0.0         0.000000         0.000000         0.000000   
+...        ...              ...              ...              ...   
+2688301    0.0         0.029999         0.219971         0.150024   
+2688302    0.0         0.170044         0.260010         0.189941   
+2688303    0.0         0.109985         0.280029         0.049988   
+2688304    0.0         0.130005         0.130005         0.000000   
+2688305    0.0         0.085693         0.399902         0.000000   
+
+         psh_flag_number  ...      AVG        Std  Tot size          IAT  \
+1074124         0.000000  ...  50.0000   0.000000   50.0000  101615016.0   
+1074125         0.000000  ...  50.0000   0.000000   50.0000   84679176.0   
+1074126         0.000000  ...  50.0000   0.000000   50.0000   84679176.0   
+1074127         0.000000  ...  50.0000   0.000000   50.0000   84679176.0   
+1074128         0.000000  ...  50.0000   0.000000   50.0000   84679176.0   
+...                  ...  ...      ...        ...       ...          ...   
+2688301         0.320068  ...  92.2500  57.750000   85.1875   84662392.0   
+2688302         0.379883  ...  74.5000   6.578125   74.5000   84662392.0   
+2688303         0.280029  ...  71.3125   5.335938   71.5625   84662392.0   
+2688304         0.370117  ...  70.3125   3.212891   69.5000   84662392.0   
+2688305         0.257080  ...  70.4375   2.517578   70.2500   48378508.0   
+
+           Number   Magnitue     Radius    Covariance  Variance    Weight  
+1074124  9.500000  10.000000   0.000000      0.000000  0.000000  141.5000  
+1074125  9.500000  10.000000   0.000000      0.000000  0.000000  141.5000  
+1074126  9.500000  10.000000   0.000000      0.000000  0.000000  141.5000  
+1074127  9.500000  10.000000   0.000000      0.000000  0.000000  141.5000  
+1074128  9.500000  10.000000   0.000000      0.000000  0.000000  141.5000  
+...           ...        ...        ...           ...       ...       ...  
+2688301  9.500000  13.296875  81.250000  13378.292969  0.939941  141.5000  
+2688302  9.500000  12.203125   9.304688     46.268032  0.950195  141.5000  
+2688303  9.500000  11.937500   7.550781     34.347900  0.939941  141.5000  
+2688304  9.500000  11.859375   4.539062     11.658729  0.939941  141.5000  
+2688305  8.859375  11.867188   3.562500      7.935763  0.828613  116.3125  
+
+[1614182 rows x 45 columns]
+2024-09-25 14:47:52,399:INFO:get_config() successfully completed......................................
+2024-09-25 14:47:52,399:INFO:Initializing get_config()
+2024-09-25 14:47:52,399:INFO:get_config(self=<pycaret.classification.oop.ClassificationExperiment object at 0x7fb9c74dbf50>, variable=y_test_transformed)
+2024-09-25 14:47:52,974:INFO:Variable: y_test returned as 1074124    1
+1074125    1
+1074126    1
+1074127    1
+1074128    1
+          ..
+2688301    2
+2688302    2
+2688303    2
+2688304    2
+2688305    2
+Name: label, Length: 1614182, dtype: int64
+2024-09-25 14:47:52,974:INFO:get_config() successfully completed......................................
+2024-09-25 14:49:46,060:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2024-09-25 14:49:46,060:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2024-09-25 14:49:46,060:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2024-09-25 14:49:46,060:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2024-09-25 14:49:53,456:INFO:PyCaret ClassificationExperiment
+2024-09-25 14:49:53,456:INFO:Logging name: clf-default-name
+2024-09-25 14:49:53,456:INFO:ML Usecase: MLUsecase.CLASSIFICATION
+2024-09-25 14:49:53,456:INFO:version 3.3.2
+2024-09-25 14:49:53,456:INFO:Initializing setup()
+2024-09-25 14:49:53,456:INFO:self.USI: facf
+2024-09-25 14:49:53,456:INFO:self._variable_keys: {'memory', 'gpu_param', 'pipeline', 'gpu_n_jobs_param', 'exp_name_log', 'log_plots_param', 'y_test', 'data', 'exp_id', 'X_test', 'fold_groups_param', '_available_plots', '_ml_usecase', 'X_train', 'y', 'fold_generator', 'fix_imbalance', 'is_multiclass', 'target_param', 'html_param', 'y_train', 'USI', 'fold_shuffle_param', 'X', 'seed', 'n_jobs_param', 'logging_param', 'idx'}
+2024-09-25 14:49:53,456:INFO:Checking environment
+2024-09-25 14:49:53,456:INFO:python_version: 3.11.9
+2024-09-25 14:49:53,456:INFO:python_build: ('main', 'Apr 10 2024 13:16:36')
+2024-09-25 14:49:53,456:INFO:machine: x86_64
+2024-09-25 14:49:53,456:INFO:platform: Linux-6.8.11-amd64-x86_64-with-glibc2.38
+2024-09-25 14:49:53,456:INFO:Memory: svmem(total=16542117888, available=9648787456, percent=41.7, used=5605490688, free=5332422656, active=7009312768, inactive=2717872128, buffers=270290944, cached=5333913600, shared=934629376, slab=480149504)
+2024-09-25 14:49:53,457:INFO:Physical Core: 8
+2024-09-25 14:49:53,457:INFO:Logical Core: 16
+2024-09-25 14:49:53,457:INFO:Checking libraries
+2024-09-25 14:49:53,457:INFO:System:
+2024-09-25 14:49:53,457:INFO:    python: 3.11.9 (main, Apr 10 2024, 13:16:36) [GCC 13.2.0]
+2024-09-25 14:49:53,457:INFO:executable: /home/fabricio/Projects/mpc/env/bin/python
+2024-09-25 14:49:53,457:INFO:   machine: Linux-6.8.11-amd64-x86_64-with-glibc2.38
+2024-09-25 14:49:53,457:INFO:PyCaret required dependencies:
+2024-09-25 14:49:53,981:INFO:                 pip: 24.1.1
+2024-09-25 14:49:53,981:INFO:          setuptools: 68.1.2
+2024-09-25 14:49:53,981:INFO:             pycaret: 3.3.2
+2024-09-25 14:49:53,981:INFO:             IPython: 8.26.0
+2024-09-25 14:49:53,981:INFO:          ipywidgets: 8.1.5
+2024-09-25 14:49:53,982:INFO:                tqdm: 4.66.5
+2024-09-25 14:49:53,982:INFO:               numpy: 1.26.4
+2024-09-25 14:49:53,982:INFO:              pandas: 2.1.4
+2024-09-25 14:49:53,982:INFO:              jinja2: 3.1.4
+2024-09-25 14:49:53,982:INFO:               scipy: 1.11.4
+2024-09-25 14:49:53,982:INFO:              joblib: 1.3.2
+2024-09-25 14:49:53,982:INFO:             sklearn: 1.4.2
+2024-09-25 14:49:53,982:INFO:                pyod: 2.0.2
+2024-09-25 14:49:53,982:INFO:            imblearn: 0.12.3
+2024-09-25 14:49:53,982:INFO:   category_encoders: 2.6.3
+2024-09-25 14:49:53,982:INFO:            lightgbm: 4.5.0
+2024-09-25 14:49:53,982:INFO:               numba: 0.60.0
+2024-09-25 14:49:53,982:INFO:            requests: 2.32.3
+2024-09-25 14:49:53,982:INFO:          matplotlib: 3.7.5
+2024-09-25 14:49:53,982:INFO:          scikitplot: 0.3.7
+2024-09-25 14:49:53,982:INFO:         yellowbrick: 1.5
+2024-09-25 14:49:53,982:INFO:              plotly: 5.24.1
+2024-09-25 14:49:53,982:INFO:    plotly-resampler: Not installed
+2024-09-25 14:49:53,982:INFO:             kaleido: 0.2.1
+2024-09-25 14:49:53,982:INFO:           schemdraw: 0.15
+2024-09-25 14:49:53,982:INFO:         statsmodels: 0.14.3
+2024-09-25 14:49:53,982:INFO:              sktime: 0.26.0
+2024-09-25 14:49:53,982:INFO:               tbats: 1.1.3
+2024-09-25 14:49:53,982:INFO:            pmdarima: 2.0.4
+2024-09-25 14:49:53,982:INFO:              psutil: 6.0.0
+2024-09-25 14:49:53,982:INFO:          markupsafe: 2.1.5
+2024-09-25 14:49:53,982:INFO:             pickle5: Not installed
+2024-09-25 14:49:53,982:INFO:         cloudpickle: 3.0.0
+2024-09-25 14:49:53,982:INFO:         deprecation: 2.1.0
+2024-09-25 14:49:53,982:INFO:              xxhash: 3.5.0
+2024-09-25 14:49:53,982:INFO:           wurlitzer: 3.1.1
+2024-09-25 14:49:53,982:INFO:PyCaret optional dependencies:
+2024-09-25 14:49:53,991:INFO:                shap: Not installed
+2024-09-25 14:49:53,991:INFO:           interpret: Not installed
+2024-09-25 14:49:53,991:INFO:                umap: Not installed
+2024-09-25 14:49:53,991:INFO:     ydata_profiling: Not installed
+2024-09-25 14:49:53,991:INFO:  explainerdashboard: Not installed
+2024-09-25 14:49:53,991:INFO:             autoviz: Not installed
+2024-09-25 14:49:53,991:INFO:           fairlearn: Not installed
+2024-09-25 14:49:53,991:INFO:          deepchecks: Not installed
+2024-09-25 14:49:53,991:INFO:             xgboost: Not installed
+2024-09-25 14:49:53,991:INFO:            catboost: Not installed
+2024-09-25 14:49:53,991:INFO:              kmodes: Not installed
+2024-09-25 14:49:53,991:INFO:             mlxtend: Not installed
+2024-09-25 14:49:53,991:INFO:       statsforecast: Not installed
+2024-09-25 14:49:53,991:INFO:        tune_sklearn: Not installed
+2024-09-25 14:49:53,991:INFO:                 ray: Not installed
+2024-09-25 14:49:53,991:INFO:            hyperopt: Not installed
+2024-09-25 14:49:53,991:INFO:              optuna: 3.6.1
+2024-09-25 14:49:53,991:INFO:               skopt: Not installed
+2024-09-25 14:49:53,991:INFO:              mlflow: Not installed
+2024-09-25 14:49:53,991:INFO:              gradio: Not installed
+2024-09-25 14:49:53,991:INFO:             fastapi: Not installed
+2024-09-25 14:49:53,991:INFO:             uvicorn: Not installed
+2024-09-25 14:49:53,991:INFO:              m2cgen: Not installed
+2024-09-25 14:49:53,992:INFO:           evidently: Not installed
+2024-09-25 14:49:53,992:INFO:               fugue: Not installed
+2024-09-25 14:49:53,992:INFO:           streamlit: Not installed
+2024-09-25 14:49:53,992:INFO:             prophet: Not installed
+2024-09-25 14:49:53,992:INFO:None
+2024-09-25 14:49:53,992:INFO:Set up data.
+2024-09-25 14:49:56,563:INFO:Set up folding strategy.
+2024-09-25 14:49:56,563:INFO:Set up train/test split.
+2024-09-25 14:49:56,563:INFO:Set up data.
+2024-09-25 14:49:57,774:INFO:Set up index.
+2024-09-25 14:49:58,272:INFO:Assigning column types.
+2024-09-25 14:49:59,238:INFO:Engine successfully changes for model 'lr' to 'sklearn'.
+2024-09-25 14:49:59,267:INFO:Engine for model 'knn' has not been set explicitly, hence returning None.
+2024-09-25 14:49:59,278:INFO:Engine for model 'rbfsvm' has not been set explicitly, hence returning None.
+2024-09-25 14:49:59,299:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,299:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,329:INFO:Engine for model 'knn' has not been set explicitly, hence returning None.
+2024-09-25 14:49:59,330:INFO:Engine for model 'rbfsvm' has not been set explicitly, hence returning None.
+2024-09-25 14:49:59,348:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,348:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,348:INFO:Engine successfully changes for model 'knn' to 'sklearn'.
+2024-09-25 14:49:59,379:INFO:Engine for model 'rbfsvm' has not been set explicitly, hence returning None.
+2024-09-25 14:49:59,397:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,397:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,427:INFO:Engine for model 'rbfsvm' has not been set explicitly, hence returning None.
+2024-09-25 14:49:59,445:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,446:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,446:INFO:Engine successfully changes for model 'rbfsvm' to 'sklearn'.
+2024-09-25 14:49:59,494:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,494:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,542:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,542:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:49:59,543:INFO:Preparing preprocessing pipeline...
+2024-09-25 14:49:59,707:INFO:Set up label encoding.
+2024-09-25 14:49:59,707:INFO:Set up simple imputation.
+2024-09-25 14:49:59,858:INFO:Set up column name cleaning.
+2024-09-25 14:50:04,556:INFO:Finished creating preprocessing pipeline.
+2024-09-25 14:50:04,559:INFO:Pipeline: Pipeline(memory=FastMemory(location=/tmp/joblib),
+         steps=[('label_encoding',
+                 TransformerWrapperWithInverse(exclude=None, include=None,
+                                               transformer=LabelEncoder())),
+                ('numerical_imputer',
+                 TransformerWrapper(exclude=None,
+                                    include=['Header_Length', 'Protocol Type',
+                                             'Duration', 'Rate', 'Srate',
+                                             'Drate', 'fin_flag_number',
+                                             'syn_flag_number',
+                                             'rst_flag_number',
+                                             'psh_flag_...
+                ('categorical_imputer',
+                 TransformerWrapper(exclude=None, include=[],
+                                    transformer=SimpleImputer(add_indicator=False,
+                                                              copy=True,
+                                                              fill_value=None,
+                                                              keep_empty_features=False,
+                                                              missing_values=nan,
+                                                              strategy='most_frequent'))),
+                ('clean_column_names',
+                 TransformerWrapper(exclude=None, include=None,
+                                    transformer=CleanColumnNames(match='[\\]\\[\\,\\{\\}\\"\\:]+')))],
+         verbose=False)
+2024-09-25 14:50:04,559:INFO:Creating final display dataframe.
+2024-09-25 14:50:10,539:INFO:Setup _display_container:                     Description  \
+0                    Session id   
+1                        Target   
+2                   Target type   
+3                Target mapping   
+4           Original data shape   
+5        Transformed data shape   
+6   Transformed train set shape   
+7    Transformed test set shape   
+8              Numeric features   
+9                    Preprocess   
+10              Imputation type   
+11           Numeric imputation   
+12       Categorical imputation   
+13               Fold Generator   
+14                  Fold Number   
+15                     CPU Jobs   
+16                      Use GPU   
+17               Log Experiment   
+18              Experiment Name   
+19                          USI   
+
+                                                Value  
+0                                                1234  
+1                                               label  
+2                                          Multiclass  
+3   DDoS: 0, DoS: 1, MQTT: 2, benign: 3, recon: 4,...  
+4                                       (5194597, 46)  
+5                                       (5194597, 46)  
+6                                       (3580415, 46)  
+7                                       (1614182, 46)  
+8                                                  45  
+9                                                True  
+10                                             simple  
+11                                               mean  
+12                                               mode  
+13                                    StratifiedKFold  
+14                                                 10  
+15                                                 -1  
+16                                              False  
+17                                              False  
+18                                   clf-default-name  
+19                                               facf  
+2024-09-25 14:50:10,592:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:50:10,592:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:50:10,639:WARNING:
+'xgboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install xgboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:50:10,640:WARNING:
+'catboost' is a soft dependency and not included in the pycaret installation. Please run: `pip install catboost` to install.
+Alternately, you can install this by running `pip install pycaret[models]`
+2024-09-25 14:50:10,642:INFO:setup() successfully completed in 17.19s...............
+2024-09-25 14:50:10,649:INFO:Initializing get_config()
+2024-09-25 14:50:10,649:INFO:get_config(self=<pycaret.classification.oop.ClassificationExperiment object at 0x7f98e460a150>, variable=X_train_transformed)
+2024-09-25 14:50:11,952:INFO:Variable: X_train returned as          Header_Length  Protocol Type  Duration          Rate         Srate  \
+0                108.0        6.00000   64.0000      0.492333      0.492333   
+1                  0.0        1.00000   64.0000      3.993303      3.993303   
+2              22997.0       17.00000   64.0000  14394.664062  14394.664062   
+3                  0.0        1.00000   64.0000      4.015690      4.015690   
+4              33148.5       16.68750   67.8125  14306.679688  14306.679688   
+...                ...            ...       ...           ...           ...   
+3580410          108.0        6.00000   64.0000      0.685062      0.685062   
+3580411          108.0        6.00000   64.0000      0.549349      0.549349   
+3580412           54.0        6.00000   64.0000     55.556641     55.556641   
+3580413        27117.0       15.71875   79.2500   3823.709473   3823.709473   
+3580414        33155.0       17.00000   64.0000  17598.283203  17598.283203   
+
+         Drate  fin_flag_number  syn_flag_number  rst_flag_number  \
+0          0.0              0.0              0.0              0.0   
+1          0.0              0.0              0.0              0.0   
+2          0.0              0.0              0.0              0.0   
+3          0.0              0.0              0.0              0.0   
+4          0.0              0.0              0.0              0.0   
+...        ...              ...              ...              ...   
+3580410    0.0              0.0              1.0              0.0   
+3580411    0.0              0.0              1.0              0.0   
+3580412    0.0              0.0              0.0              0.0   
+3580413    0.0              0.0              0.0              0.0   
+3580414    0.0              0.0              0.0              0.0   
+
+         psh_flag_number  ...     AVG       Std  Tot size         IAT  Number  \
+0                    0.0  ...  54.000  0.000000  54.00000  84670904.0     9.5   
+1                    0.0  ...  42.000  0.000000  42.00000  84697088.0     9.5   
+2                    0.0  ...  50.000  0.000000  50.00000  84696864.0     9.5   
+3                    0.0  ...  42.000  0.000000  42.00000  84696968.0     9.5   
+4                    0.0  ...  51.125  1.502930  50.40625  84675224.0     9.5   
+...                  ...  ...     ...       ...       ...         ...     ...   
+3580410              0.0  ...  54.000  0.000000  54.00000  84674680.0     9.5   
+3580411              0.0  ...  54.000  0.000000  54.00000  84674640.0     9.5   
+3580412              0.0  ...  54.000  0.000000  54.00000  84696128.0     9.5   
+3580413              0.0  ...  52.125  1.710938  51.59375  84675208.0     9.5   
+3580414              0.0  ...  50.000  0.000000  50.00000  84696856.0     9.5   
+
+          Magnitue    Radius  Covariance  Variance  Weight  
+0        10.390625  0.000000    0.000000  0.000000   141.5  
+1         9.164062  0.000000    0.000000  0.000000   141.5  
+2        10.000000  0.000000    0.000000  0.000000   141.5  
+3         9.164062  0.000000    0.000000  0.000000   141.5  
+4        10.109375  2.126953   12.260036  0.189941   141.5  
+...            ...       ...         ...       ...     ...  
+3580410  10.390625  0.000000    0.000000  0.000000   141.5  
+3580411  10.390625  0.000000    0.000000  0.000000   141.5  
+3580412  10.390625  0.000000    0.000000  0.000000   141.5  
+3580413  10.203125  2.412109   14.892212  0.199951   141.5  
+3580414  10.000000  0.000000    0.000000  0.000000   141.5  
+
+[3580415 rows x 45 columns]
+2024-09-25 14:50:11,952:INFO:get_config() successfully completed......................................
+2024-09-25 14:50:11,952:INFO:Initializing get_config()
+2024-09-25 14:50:11,952:INFO:get_config(self=<pycaret.classification.oop.ClassificationExperiment object at 0x7f98e460a150>, variable=y_train_transformed)
+2024-09-25 14:50:13,557:INFO:Variable: y_train returned as 0          1
+1          0
+2          0
+3          0
+4          1
+          ..
+3580410    1
+3580411    1
+3580412    0
+3580413    1
+3580414    0
+Name: label, Length: 3580415, dtype: int64
+2024-09-25 14:50:13,557:INFO:get_config() successfully completed......................................
+2024-09-25 14:50:13,563:INFO:Initializing get_config()
+2024-09-25 14:50:13,564:INFO:get_config(self=<pycaret.classification.oop.ClassificationExperiment object at 0x7f98e460a150>, variable=X_test_transformed)
+2024-09-25 14:50:14,296:INFO:Variable: X_test returned as          Header_Length  Protocol Type  Duration           Rate          Srate  \
+3580415    2525.000000       17.00000   64.0000  190424.250000  190424.250000   
+3580416    7525.000000       17.00000   64.0000   30811.365234   30811.365234   
+3580417    7659.500000       17.00000   64.0000  130358.820312  130358.820312   
+3580418    4375.000000       17.00000   64.0000   22628.230469   22628.230469   
+3580419    9375.000000       17.00000   64.0000   21570.292969   21570.292969   
+...                ...            ...       ...            ...            ...   
+5194592    3249.300049        6.21875   65.9375      13.629925      13.629925   
+5194593     679.840027        6.00000   64.0000       2.697452       2.697452   
+5194594     667.820007        6.00000   64.0000       5.641158       5.641158   
+5194595     832.020020        6.00000   64.0000       8.737793       8.737793   
+5194596     462.171417        6.00000   64.0000       3.469970       3.469970   
+
+         Drate  fin_flag_number  syn_flag_number  rst_flag_number  \
+3580415    0.0         0.000000         0.000000         0.000000   
+3580416    0.0         0.000000         0.000000         0.000000   
+3580417    0.0         0.000000         0.000000         0.000000   
+3580418    0.0         0.000000         0.000000         0.000000   
+3580419    0.0         0.000000         0.000000         0.000000   
+...        ...              ...              ...              ...   
+5194592    0.0         0.029999         0.219971         0.150024   
+5194593    0.0         0.170044         0.260010         0.189941   
+5194594    0.0         0.109985         0.280029         0.049988   
+5194595    0.0         0.130005         0.130005         0.000000   
+5194596    0.0         0.085693         0.399902         0.000000   
+
+         psh_flag_number  ...      AVG        Std  Tot size          IAT  \
+3580415         0.000000  ...  50.0000   0.000000   50.0000  101615016.0   
+3580416         0.000000  ...  50.0000   0.000000   50.0000   84679176.0   
+3580417         0.000000  ...  50.0000   0.000000   50.0000   84679176.0   
+3580418         0.000000  ...  50.0000   0.000000   50.0000   84679176.0   
+3580419         0.000000  ...  50.0000   0.000000   50.0000   84679176.0   
+...                  ...  ...      ...        ...       ...          ...   
+5194592         0.320068  ...  92.2500  57.750000   85.1875   84662392.0   
+5194593         0.379883  ...  74.5000   6.578125   74.5000   84662392.0   
+5194594         0.280029  ...  71.3125   5.335938   71.5625   84662392.0   
+5194595         0.370117  ...  70.3125   3.212891   69.5000   84662392.0   
+5194596         0.257080  ...  70.4375   2.517578   70.2500   48378508.0   
+
+           Number   Magnitue     Radius    Covariance  Variance    Weight  
+3580415  9.500000  10.000000   0.000000      0.000000  0.000000  141.5000  
+3580416  9.500000  10.000000   0.000000      0.000000  0.000000  141.5000  
+3580417  9.500000  10.000000   0.000000      0.000000  0.000000  141.5000  
+3580418  9.500000  10.000000   0.000000      0.000000  0.000000  141.5000  
+3580419  9.500000  10.000000   0.000000      0.000000  0.000000  141.5000  
+...           ...        ...        ...           ...       ...       ...  
+5194592  9.500000  13.296875  81.250000  13378.292969  0.939941  141.5000  
+5194593  9.500000  12.203125   9.304688     46.268032  0.950195  141.5000  
+5194594  9.500000  11.937500   7.550781     34.347900  0.939941  141.5000  
+5194595  9.500000  11.859375   4.539062     11.658729  0.939941  141.5000  
+5194596  8.859375  11.867188   3.562500      7.935763  0.828613  116.3125  
+
+[1614182 rows x 45 columns]
+2024-09-25 14:50:14,297:INFO:get_config() successfully completed......................................
+2024-09-25 14:50:14,297:INFO:Initializing get_config()
+2024-09-25 14:50:14,297:INFO:get_config(self=<pycaret.classification.oop.ClassificationExperiment object at 0x7f98e460a150>, variable=y_test_transformed)
+2024-09-25 14:50:14,970:INFO:Variable: y_test returned as 3580415    1
+3580416    1
+3580417    1
+3580418    1
+3580419    1
+          ..
+5194592    2
+5194593    2
+5194594    2
+5194595    2
+5194596    2
+Name: label, Length: 1614182, dtype: int64
+2024-09-25 14:50:14,970:INFO:get_config() successfully completed......................................
