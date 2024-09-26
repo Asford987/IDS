@@ -1,16 +1,47 @@
 import os
+
+import numpy as np
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import warnings
 warnings.filterwarnings("ignore")
 
-from sklearn.metrics import fbeta_score, precision_score, recall_score, average_precision_score
+from sklearn.metrics import fbeta_score, precision_score, recall_score, average_precision_score, confusion_matrix
 from sklearn.preprocessing import label_binarize
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import grad_norm
+
+
+def compute_macro_fpr(targets, preds, num_classes):
+    """
+    Compute the False Positive Rate (FPR) for each class and the macro-average FPR.
+    """
+    cm = confusion_matrix(targets, preds, labels=list(range(num_classes)))
+    FP = cm.sum(axis=0) - np.diag(cm)
+    TN = cm.sum() - (FP + cm.sum(axis=1) - np.diag(cm) + np.diag(cm))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        FPR = FP / (FP + TN)
+        FPR = np.nan_to_num(FPR)  # Replace NaN with 0
+    fpr_macro = np.mean(FPR)
+    return fpr_macro, FPR
+
+
+
+def precision_recall_curve_per_class(targets, y_scores, num_classes):
+    pr_aucs = []
+    for i in range(num_classes):
+        binary_targets = (targets == i).astype(int)
+        class_scores = y_scores[:, i]
+        if binary_targets.sum() == 0:
+            pr_auc = np.nan  # Handle classes not present in targets
+        else:
+            pr_auc = average_precision_score(binary_targets, class_scores)
+        pr_aucs.append(pr_auc)
+    return pr_aucs
+
 
 
 class NIDLoss(nn.Module):
@@ -25,6 +56,7 @@ class NIDLoss(nn.Module):
         self.alpha = alpha
         self.beta = beta
         self.reduction = reduction
+        self.epsilon = 1e-12
 
     def forward(self, inputs, targets):
         """
@@ -37,9 +69,9 @@ class NIDLoss(nn.Module):
         
         # Apply softmax to the inputs to get probabilities
         probs = F.softmax(inputs, dim=1)
-        
         # Get the probability for the correct class
         p_t = (probs * targets_one_hot).sum(dim=1)
+        p_t = p_t.clamp(min=self.epsilon, max=1 - self.epsilon)
         
         # Compute the NID loss as per the formula
         nid_loss = -self.alpha * (1 - p_t) ** self.beta * torch.log(p_t)
@@ -88,14 +120,13 @@ class GateModel(pl.LightningModule):
         self.save_hyperparameters()
 
     def initialize_weights(self):
-        pass
         for layer in self.model:
             if isinstance(layer, nn.Linear):
                 nn.init.xavier_uniform_(layer.weight)
                 nn.init.zeros_(layer.bias)
     
-    def forward(self, x):
-        return F.softmax(self.model(x), dim=1)
+    def forward(self, x) -> torch.Tensor:
+        return self.model(x)
     
     def on_fit_start(self):
         self.criterion = NIDLoss()
@@ -117,7 +148,7 @@ class GateModel(pl.LightningModule):
         x, y = batch
         with torch.no_grad():
             y_hat = self(x)  # These are the raw logits
-        preds = torch.argmax(y_hat, dim=1)
+        preds = torch.argmax(F.softmax(y_hat, dim=1), dim=1)
         
         # Store logits and class predictions
         self.val_preds.append(preds.cpu())
@@ -137,29 +168,39 @@ class GateModel(pl.LightningModule):
         logits = torch.cat(self.val_logits)  # Assuming you're storing the raw outputs during validation
         y_scores = F.softmax(logits, dim=1).cpu().numpy()
 
-        # Calculate general metrics
-        f2_score_macro = fbeta_score(targets.numpy(), preds.numpy(), beta=2, average='macro')
-        precision_macro = precision_score(targets.numpy(), preds.numpy(), average='macro')
-        recall_macro = recall_score(targets.numpy(), preds.numpy(), average='macro')
-        fpr_macro = 1 - recall_macro  # FPR is 1 - recall for binary, adjust this if you need a multiclass approach
+        targets_np = targets.cpu().numpy()
+        preds_np = preds.cpu().numpy()
+        
+        # Calculate macro metrics
+        f2_score_macro = fbeta_score(targets_np, preds_np, beta=2, average='macro', zero_division=1)
+        precision_macro = precision_score(targets_np, preds_np, average='macro', zero_division=1)
+        recall_macro = recall_score(targets_np, preds_np, average='macro', zero_division=1)
         pr_auc_macro = average_precision_score(y_true, y_scores, average='macro')
+        
+        # Compute FPR
+        fpr_macro, fpr_per_class = compute_macro_fpr(targets_np, preds_np, self.num_experts)
+        
 
         self.log('val_precision', precision_macro, logger=True)
         self.log('val_recall', recall_macro, logger=True)
         self.log('val_f2', f2_score_macro, prog_bar=True, logger=True)
         self.log('val_fpr', fpr_macro, logger=True)
         self.log('val_pr_auc', pr_auc_macro, logger=True)
-
-        # Calculate per-class metrics (keeping this part the same)
+        
+        # Calculate per-class metrics
         f2_scores = fbeta_score(targets.numpy(), preds.numpy(), beta=2, average=None, zero_division=1)
         precision_scores = precision_score(targets.numpy(), preds.numpy(), average=None, zero_division=1)
         recall_scores = recall_score(targets.numpy(), preds.numpy(), average=None, zero_division=1)
-        pr_auc_scores = precision_recall_curve_per_class(targets.numpy(), preds.numpy(), self.num_experts)
-
-        for class_idx, (f2_score, prec_score_class, recall_score_class, pr_auc_score_class) in enumerate(zip(f2_scores, precision_scores, recall_scores, pr_auc_scores)):
+        pr_auc_scores = precision_recall_curve_per_class(targets.numpy(), y_scores, self.num_experts)
+        
+        # Log per-class metrics, including FPR
+        for class_idx, (f2_score, prec_score_class, recall_score_class, pr_auc_score_class, fpr_class) in enumerate(
+            zip(f2_scores, precision_scores, recall_scores, pr_auc_scores, fpr_per_class)
+        ):
             self.log(f'val_f2_class_{class_idx}', f2_score, logger=True, prog_bar=False)
             self.log(f'val_precision_class_{class_idx}', prec_score_class, logger=True, prog_bar=False)
             self.log(f'val_recall_class_{class_idx}', recall_score_class, logger=True, prog_bar=False)
+            self.log(f'val_fpr_class_{class_idx}', fpr_class, logger=True, prog_bar=False)
             self.log(f'val_pr_auc_class_{class_idx}', pr_auc_score_class, logger=True, prog_bar=False)
 
             
@@ -195,16 +236,6 @@ class GateModel(pl.LightningModule):
         ]
 
         return [optimizer], schedulers
-
-def precision_recall_curve_per_class(targets, preds, num_classes):
-    """ Helper function to compute PR AUC per class """
-    pr_aucs = []
-    for i in range(num_classes):
-        binary_targets = (targets == i).astype(int)
-        binary_preds = (preds == i).astype(int)
-        pr_auc = average_precision_score(binary_targets, binary_preds)
-        pr_aucs.append(pr_auc)
-    return pr_aucs
 
 
 class ExpertModel(pl.LightningModule):
