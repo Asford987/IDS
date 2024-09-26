@@ -11,6 +11,46 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 
 
+class NIDLoss(nn.Module):
+    def __init__(self, alpha=1.0, beta=1.0, reduction='mean'):
+        """
+        :param alpha: A scaling factor for class n.
+        :param beta: Focusing parameter to control the degree of loss attenuation.
+        :param class_weights: Optional tensor of class weights for handling class imbalance.
+        :param reduction: Specifies the reduction to apply to the output ('none', 'mean', 'sum').
+        """
+        super(NIDLoss, self).__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        """
+        Forward pass for NID Loss.
+        :param inputs: Predicted logits of shape [batch_size, num_classes].
+        :param targets: Ground truth labels of shape [batch_size].
+        """
+        # Convert targets to one-hot encoding
+        targets_one_hot = torch.eye(inputs.size(1), device=targets.device)[targets]
+        
+        # Apply softmax to the inputs to get probabilities
+        probs = F.softmax(inputs, dim=1)
+        
+        # Get the probability for the correct class
+        p_t = (probs * targets_one_hot).sum(dim=1)
+        
+        # Compute the NID loss as per the formula
+        nid_loss = -self.alpha * (1 - p_t) ** self.beta * torch.log(p_t)
+        
+        # Apply the reduction method
+        if self.reduction == 'mean':
+            return nid_loss.mean()
+        elif self.reduction == 'sum':
+            return nid_loss.sum()
+        else:
+            return nid_loss
+
+
 class WarmupScheduler(torch.optim.lr_scheduler.LRScheduler):
     def __init__(self, optimizer, warmup_epochs, fixed_lr, prev_lr, last_epoch=-1):
         self.warmup_epochs = warmup_epochs
@@ -21,30 +61,12 @@ class WarmupScheduler(torch.optim.lr_scheduler.LRScheduler):
 
     def get_lr(self, epoch=None):
         if self.last_epoch < self.warmup_epochs:
-            # Return fixed learning rate during warmup period
             return [self.fixed_lr for _ in self.optimizer.param_groups]
         elif self.last_epoch > self.warmup_epochs:
             return [group['lr'] for group in self.optimizer.param_groups]
         else:
-            # After warmup, return the learning rate according to the optimizer's initial values
             return [self.prev_lr for _ in self.optimizer.param_groups]
 
-
-class ExpertModel(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_units, dropout_rate):
-        super(ExpertModel, self).__init__()
-        layers = []
-        for units in hidden_units:
-            layers.append(nn.BatchNorm1d(input_dim))
-            layers.append(nn.Linear(input_dim, units))
-            layers.append(nn.LeakyReLU())
-            layers.append(nn.Dropout(dropout_rate))
-            input_dim = units
-        layers.append(nn.Linear(input_dim, output_dim))
-        self.model = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.model(x)
 
 class GateModel(pl.LightningModule):
     def __init__(self, input_dim, num_experts, hidden_units, dropout_rate, class_weights, learning_rate=1e-3):
@@ -62,8 +84,8 @@ class GateModel(pl.LightningModule):
         self.num_experts = num_experts
         self.learning_rate = learning_rate
         self.class_weights = torch.tensor(class_weights, dtype=torch.float32) if class_weights is not None else torch.ones(self.num_classes)
-        self.criterion = nn.CrossEntropyLoss(self.class_weights)
         self.initialize_weights()
+        self.save_hyperparameters()
 
     def initialize_weights(self):
         for layer in self.model:
@@ -73,6 +95,9 @@ class GateModel(pl.LightningModule):
 
     def forward(self, x):
         return F.softmax(self.model(x), dim=1)
+    
+    def on_fit_start(self):
+        self.criterion = NIDLoss()
     
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -89,7 +114,6 @@ class GateModel(pl.LightningModule):
         preds = torch.argmax(y_hat, dim=1)
         self.val_preds.append(preds.cpu())
         self.val_targets.append(y.cpu())
-
         total_loss = self.criterion(y_hat, y)
         self.log('val_total_loss', total_loss, logger=True, prog_bar=True)
         return total_loss
@@ -115,12 +139,12 @@ class GateModel(pl.LightningModule):
         self.log('val_f2', f2_score_macro, prog_bar=True, logger=True)
     
     def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate, weight_decay=1e-2)
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate, weight_decay=1e-3)
         scheduler1 = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='max', factor=0.8, patience=5, verbose=True, min_lr=1e-6
         )
         
-        scheduler = WarmupScheduler(optimizer, warmup_epochs=5, fixed_lr=1e-2, prev_lr=self.learning_rate)
+        # scheduler = WarmupScheduler(optimizer, warmup_epochs=5, fixed_lr=1e-1, prev_lr=self.learning_rate)
         
         schedulers = [
             {
@@ -131,15 +155,33 @@ class GateModel(pl.LightningModule):
                 'frequency': 1,
                 'name': 'ReduceLROnPlateau'
             },
-            {
-                'scheduler': scheduler,
-                'interval': 'epoch',
-                'frequency': 1,
-                'name': 'CustomLRScheduler'
-            }
+            # {
+            #     'scheduler': scheduler,
+            #     'interval': 'epoch',
+            #     'frequency': 1,
+            #     'name': 'CustomLRScheduler'
+            # }
         ]
 
         return [optimizer], schedulers
+
+
+class ExpertModel(nn.Module):
+    def __init__(self, input_dim, output_dim, hidden_units, dropout_rate):
+        super(ExpertModel, self).__init__()
+        layers = []
+        for units in hidden_units:
+            layers.append(nn.BatchNorm1d(input_dim))
+            layers.append(nn.Linear(input_dim, units))
+            layers.append(nn.LeakyReLU())
+            layers.append(nn.Dropout(dropout_rate))
+            input_dim = units
+        layers.append(nn.Linear(input_dim, output_dim))
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.model(x)
+
     
 
 class MoE(pl.LightningModule):
@@ -162,7 +204,7 @@ class MoE(pl.LightningModule):
 
     def load_balancing_loss(self, gating_weights, y):
         expert_utilization = torch.mean(gating_weights, dim=0)
-        class_weights = self.class_weights.to('cuda')[y]  # Get weights corresponding to the batch's true labels
+        class_weights = self.class_weights.to('cuda')[y]
         weighted_utilization = torch.mean(gating_weights * class_weights.unsqueeze(1), dim=0)
         ideal_utilization = torch.ones_like(expert_utilization) / self.num_classes
         loss = torch.norm(weighted_utilization - ideal_utilization)
@@ -228,8 +270,6 @@ class MoE(pl.LightningModule):
 
         self.class_weights = self.compute_class_weights(f2_scores)
 
-
-        # Log metrics
         self.log('val_precision', prec, logger=True)
         self.log('val_recall', recall, logger=True)
         self.log('val_f2', f2_score_macro, prog_bar=True, logger=True)
