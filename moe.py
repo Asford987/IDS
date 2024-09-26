@@ -4,15 +4,17 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import warnings
 warnings.filterwarnings("ignore")
 
-from sklearn.metrics import fbeta_score, precision_score, recall_score
+from sklearn.metrics import fbeta_score, precision_score, recall_score, average_precision_score
+from sklearn.preprocessing import label_binarize
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
+from pytorch_lightning.utilities import grad_norm
 
 
 class NIDLoss(nn.Module):
-    def __init__(self, alpha=1.0, beta=1.0, reduction='mean'):
+    def __init__(self, alpha=1.0, beta=2.0, reduction='mean'):
         """
         :param alpha: A scaling factor for class n.
         :param beta: Focusing parameter to control the degree of loss attenuation.
@@ -67,38 +69,37 @@ class WarmupScheduler(torch.optim.lr_scheduler.LRScheduler):
         else:
             return [self.prev_lr for _ in self.optimizer.param_groups]
 
-
 class GateModel(pl.LightningModule):
-    def __init__(self, input_dim, num_experts, hidden_units, dropout_rate, class_weights, learning_rate=1e-3):
+    def __init__(self, input_dim, num_experts, hidden_units, dropout_rate, class_weights=None, learning_rate=1e-3):
         super(GateModel, self).__init__()
         self.input_dim = input_dim
         layers = []
         for units in hidden_units:
             layers.append(nn.BatchNorm1d(input_dim))
             layers.append(nn.Linear(input_dim, units))
-            layers.append(nn.LeakyReLU())
-            layers.append(nn.Dropout(dropout_rate))
+            layers.append(nn.Mish())
             input_dim = units
         layers.append(nn.Linear(input_dim, num_experts))
         self.model = nn.Sequential(*layers)
         self.num_experts = num_experts
         self.learning_rate = learning_rate
-        self.class_weights = torch.tensor(class_weights, dtype=torch.float32) if class_weights is not None else torch.ones(self.num_classes)
+        self.class_weights = torch.tensor(class_weights, dtype=torch.float32) if class_weights is not None else torch.ones(self.num_experts)
         self.initialize_weights()
         self.save_hyperparameters()
 
     def initialize_weights(self):
+        pass
         for layer in self.model:
             if isinstance(layer, nn.Linear):
                 nn.init.xavier_uniform_(layer.weight)
                 nn.init.zeros_(layer.bias)
-
+    
     def forward(self, x):
         return F.softmax(self.model(x), dim=1)
     
     def on_fit_start(self):
         self.criterion = NIDLoss()
-    
+
     def training_step(self, batch, batch_idx):
         x, y = batch
         y = y.long().squeeze()
@@ -107,44 +108,74 @@ class GateModel(pl.LightningModule):
         self.log('train_loss', loss, prog_bar=True, logger=True)
         return loss
     
+    def on_validation_epoch_start(self):
+        self.val_preds = []
+        self.val_logits = []  # Initialize to store logits
+        self.val_targets = []
+        
     def validation_step(self, batch, batch_idx):
         x, y = batch
         with torch.no_grad():
-            y_hat = self(x)
+            y_hat = self(x)  # These are the raw logits
         preds = torch.argmax(y_hat, dim=1)
+        
+        # Store logits and class predictions
         self.val_preds.append(preds.cpu())
+        self.val_logits.append(y_hat.cpu())  # Store logits
         self.val_targets.append(y.cpu())
+        
         total_loss = self.criterion(y_hat, y)
         self.log('val_total_loss', total_loss, logger=True, prog_bar=True)
         return total_loss
-
-    def on_validation_epoch_start(self):
-        self.val_preds = []
-        self.val_targets = []
 
     def on_validation_epoch_end(self):
         preds = torch.cat(self.val_preds)
         targets = torch.cat(self.val_targets)
         
-        f2_score_macro = fbeta_score(targets.numpy(), preds.numpy(), beta=2, average='macro')
-        prec = precision_score(targets.numpy(), preds.numpy(), average='macro')
-        recall = recall_score(targets.numpy(), preds.numpy(), average='macro')
-        f2_scores = fbeta_score(targets.numpy(), preds.numpy(), beta=2, average=None, zero_division=1)
-        f2_scores = torch.tensor(f2_scores, dtype=torch.float32).to(self.device)
-        for class_idx, f2_score in enumerate(f2_scores):
-            self.log(f'val_f2_class_{class_idx}', f2_score, logger=True, prog_bar=False)
+        # Ensure targets are one-hot encoded for multiclass average precision
+        y_true = label_binarize(targets.numpy(), classes=list(range(self.num_experts)))  # One-hot encoding for multiclass
+        logits = torch.cat(self.val_logits)  # Assuming you're storing the raw outputs during validation
+        y_scores = F.softmax(logits, dim=1).cpu().numpy()
 
-        self.log('val_precision', prec, logger=True)
-        self.log('val_recall', recall, logger=True)
+        # Calculate general metrics
+        f2_score_macro = fbeta_score(targets.numpy(), preds.numpy(), beta=2, average='macro')
+        precision_macro = precision_score(targets.numpy(), preds.numpy(), average='macro')
+        recall_macro = recall_score(targets.numpy(), preds.numpy(), average='macro')
+        fpr_macro = 1 - recall_macro  # FPR is 1 - recall for binary, adjust this if you need a multiclass approach
+        pr_auc_macro = average_precision_score(y_true, y_scores, average='macro')
+
+        self.log('val_precision', precision_macro, logger=True)
+        self.log('val_recall', recall_macro, logger=True)
         self.log('val_f2', f2_score_macro, prog_bar=True, logger=True)
-    
+        self.log('val_fpr', fpr_macro, logger=True)
+        self.log('val_pr_auc', pr_auc_macro, logger=True)
+
+        # Calculate per-class metrics (keeping this part the same)
+        f2_scores = fbeta_score(targets.numpy(), preds.numpy(), beta=2, average=None, zero_division=1)
+        precision_scores = precision_score(targets.numpy(), preds.numpy(), average=None, zero_division=1)
+        recall_scores = recall_score(targets.numpy(), preds.numpy(), average=None, zero_division=1)
+        pr_auc_scores = precision_recall_curve_per_class(targets.numpy(), preds.numpy(), self.num_experts)
+
+        for class_idx, (f2_score, prec_score_class, recall_score_class, pr_auc_score_class) in enumerate(zip(f2_scores, precision_scores, recall_scores, pr_auc_scores)):
+            self.log(f'val_f2_class_{class_idx}', f2_score, logger=True, prog_bar=False)
+            self.log(f'val_precision_class_{class_idx}', prec_score_class, logger=True, prog_bar=False)
+            self.log(f'val_recall_class_{class_idx}', recall_score_class, logger=True, prog_bar=False)
+            self.log(f'val_pr_auc_class_{class_idx}', pr_auc_score_class, logger=True, prog_bar=False)
+
+            
+    def on_before_optimizer_step(self, optimizer):
+        # Compute the 2-norm for each layer
+        # If using mixed precision, the gradients are already unscaled here
+        norms = grad_norm(self.model, norm_type=2)
+        self.log_dict(norms)
+
     def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate, weight_decay=1e-3)
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate)
         scheduler1 = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='max', factor=0.8, patience=5, verbose=True, min_lr=1e-6
         )
         
-        # scheduler = WarmupScheduler(optimizer, warmup_epochs=5, fixed_lr=1e-1, prev_lr=self.learning_rate)
+        scheduler = WarmupScheduler(optimizer, warmup_epochs=2, fixed_lr=1e-1, prev_lr=self.learning_rate)
         
         schedulers = [
             {
@@ -155,18 +186,28 @@ class GateModel(pl.LightningModule):
                 'frequency': 1,
                 'name': 'ReduceLROnPlateau'
             },
-            # {
-            #     'scheduler': scheduler,
-            #     'interval': 'epoch',
-            #     'frequency': 1,
-            #     'name': 'CustomLRScheduler'
-            # }
+            {
+                'scheduler': scheduler,
+                'interval': 'epoch',
+                'frequency': 1,
+                'name': 'CustomLRScheduler'
+            }
         ]
 
         return [optimizer], schedulers
 
+def precision_recall_curve_per_class(targets, preds, num_classes):
+    """ Helper function to compute PR AUC per class """
+    pr_aucs = []
+    for i in range(num_classes):
+        binary_targets = (targets == i).astype(int)
+        binary_preds = (preds == i).astype(int)
+        pr_auc = average_precision_score(binary_targets, binary_preds)
+        pr_aucs.append(pr_auc)
+    return pr_aucs
 
-class ExpertModel(nn.Module):
+
+class ExpertModel(pl.LightningModule):
     def __init__(self, input_dim, output_dim, hidden_units, dropout_rate):
         super(ExpertModel, self).__init__()
         layers = []
@@ -181,8 +222,7 @@ class ExpertModel(nn.Module):
 
     def forward(self, x):
         return self.model(x)
-
-    
+ 
 
 class MoE(pl.LightningModule):
     def __init__(self, gate_model: GateModel, num_expert_models, expert_hidden_units, learning_rate=1e-3, dropout_rate=0.2, class_weights=None):
