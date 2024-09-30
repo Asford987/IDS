@@ -178,6 +178,7 @@ Werkzeug==3.0.3
 widgetsnbextension==4.0.13
 wrapt==1.16.0
 wurlitzer==3.1.1
+xgboost==2.1.1
 xxhash==3.5.0
 yarl==1.9.4
 yellowbrick==1.5

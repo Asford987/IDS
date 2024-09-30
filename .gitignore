@@ -3,4 +3,10 @@ __pycache__
 *.ckpt
 *.zip
 teste/*
-models
+models/cnn
+models/rnn
+models/base.py
+models/moe/*
+!models/ffn
+!models/utils.py
+!models/moe/expert.py

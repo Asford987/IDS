@@ -1,7 +1,6 @@
 import os
 
 import numpy as np
-from torch.optim.optimizer import Optimizer
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import warnings
@@ -42,14 +41,6 @@ def precision_recall_curve_per_class(targets, y_scores, num_classes):
             pr_auc = average_precision_score(binary_targets, class_scores)
         pr_aucs.append(pr_auc)
     return pr_aucs
-
-
-class ExpertPretrainDataset(torch.utils.data.Dataset):
-    pass
-
-class ExpertPretrainDataModule(pl.LightningDataModule):
-    pass
-
 
 
 class FocalLoss(nn.Module):
@@ -261,7 +252,7 @@ class ExpertModel(pl.LightningModule):
     def on_validation_step_start(self): pass
     def validation_step(self, batch, batch_idx): pass
     def on_validation_epoch_end(self) -> None: pass
-    def on_before_optimizer_step(self, optimizer: Optimizer) -> None: pass
+    def on_before_optimizer_step(self, optimizer) -> None: pass
     def configure_optimizers(self): pass
 
 class MoE(pl.LightningModule):
