@@ -57,29 +57,32 @@ class FocalLoss(nn.Module):
 
     def forward(self, inputs, targets):
         """
-        Forward pass for NID Loss.
-        :param inputs: Predicted logits of shape [batch_size, num_classes].
-        :param targets: Ground truth labels of shape [batch_size].
+            Forward pass for Focal Loss.
+            :param inputs: Predicted logits of shape [batch_size, num_classes] (for multi-class)
+                or [batch_size, 1] (for binary classification).
+            :param targets: Ground truth labels of shape [batch_size] (binary: 0 or 1, multi-class: class indices).
         """
-        # Convert targets to one-hot encoding
-        targets_one_hot = torch.eye(inputs.size(1), device=targets.device)[targets]
-        
-        # Apply softmax to the inputs to get probabilities
-        probs = F.softmax(inputs, dim=1)
-        # Get the probability for the correct class
-        p_t = (probs * targets_one_hot).sum(dim=1)
-        p_t = p_t.clamp(min=self.epsilon, max=1 - self.epsilon)
-        
-        # Compute the NID loss as per the formula
-        nid_loss = -self.alpha * (1 - p_t) ** self.beta * torch.log(p_t)
-        
-        # Apply the reduction method
-        if self.reduction == 'mean':
-            return nid_loss.mean()
-        elif self.reduction == 'sum':
-            return nid_loss.sum()
+        if inputs.size(1) == 1:
+            probs = torch.sigmoid(inputs).squeeze(1)
+            targets = targets.float()
         else:
-            return nid_loss
+            targets_one_hot = torch.eye(inputs.size(1), device=targets.device)[targets]
+            probs = F.softmax(inputs, dim=1)
+        
+        if inputs.size(1) == 1:
+            p_t = probs * targets + (1 - probs) * (1 - targets)
+        else:
+            p_t = (probs * targets_one_hot).sum(dim=1)
+        
+        p_t = p_t.clamp(min=self.epsilon, max=1 - self.epsilon)
+        focal_loss = -self.alpha * (1 - p_t) ** self.beta * torch.log(p_t)
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        else:
+            return focal_loss
+
 
 
 class WarmupScheduler(torch.optim.lr_scheduler.LRScheduler):

@@ -73,7 +73,7 @@ class FeedForward(pl.LightningModule):
         self.val_targets.append(y.cpu())
         
         total_loss = self.criterion(y_hat, y)
-        self.log('val_total_loss', total_loss, logger=True, prog_bar=True)
+        self.log('val_loss', total_loss, logger=True, prog_bar=True)
         return total_loss
 
     def on_validation_epoch_end(self):
@@ -114,11 +114,6 @@ class FeedForward(pl.LightningModule):
             self.log(f'val_recall_class_{class_idx}', recall_score_class, logger=True, prog_bar=False)
             self.log(f'val_fpr_class_{class_idx}', fpr_class, logger=True, prog_bar=False)
             self.log(f'val_pr_auc_class_{class_idx}', pr_auc_score_class, logger=True, prog_bar=False)
-
-            
-    def on_before_optimizer_step(self, optimizer):
-        norms = grad_norm(self.model, norm_type=2)
-        self.log_dict(norms)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
