@@ -6,7 +6,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import warnings
 warnings.filterwarnings("ignore")
 
-from sklearn.metrics import fbeta_score, precision_score, recall_score, average_precision_score
+from sklearn.metrics import fbeta_score, precision_score, recall_score, average_precision_score, confusion_matrix
 from sklearn.preprocessing import label_binarize
 import torch
 import torch.nn as nn
@@ -26,7 +26,7 @@ class ExpertPretrainDataset(torch.utils.data.Dataset):
         else: data = path
         
         self.X = data.drop(columns=['Label']).astype(np.float32)
-        self.y = np.asarray(data['Label'].astype('category').cat.codes == binarize_on_label, dtype=np.int64) 
+        self.y = np.asarray(data['Label'] == binarize_on_label, dtype=np.int64) 
     
     def __getitem__(self, idx):
         return self.X.iloc[idx].values, self.y[idx]
@@ -125,9 +125,15 @@ class ExpertModel(pl.LightningModule):
         targets_np = targets.cpu().numpy()
         preds_np = preds.cpu().numpy()
         
-        f2_score_macro = fbeta_score(targets_np, preds_np, beta=2, average='binary', zero_division=1)
-        precision_macro = precision_score(targets_np, preds_np, average='binary', zero_division=1)
-        recall_macro = recall_score(targets_np, preds_np, average='binary', zero_division=1)
+        cm = confusion_matrix(targets_np, preds_np, labels=[0, 1])
+        _, fp, fn, _ = cm.ravel()
+        
+        self.log('val_fp', fp, prog_bar=True, logger=True)
+        self.log('val_fn', fn, prog_bar=True, logger=True)
+        
+        f2_score_macro = fbeta_score(targets_np, preds_np, beta=2, average='binary', zero_division='warn')
+        precision_macro = precision_score(targets_np, preds_np, average='binary', zero_division='warn')
+        recall_macro = recall_score(targets_np, preds_np, average='binary', zero_division='warn')
         pr_auc_macro = average_precision_score(y_true, y_scores, average='macro')
         
         fpr_macro, _ = compute_macro_fpr(targets_np, preds_np, self.num_experts)
@@ -138,9 +144,9 @@ class ExpertModel(pl.LightningModule):
         self.log('val_fpr', fpr_macro, logger=True)
         self.log('val_pr_auc', pr_auc_macro, logger=True)
         
-    def on_before_optimizer_step(self, optimizer):
-        norms = grad_norm(self.model, norm_type=2)
-        self.log_dict(norms)
+    # def on_before_optimizer_step(self, optimizer):
+    #     norms = grad_norm(self.model, norm_type=2)
+    #     self.log_dict(norms)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate)

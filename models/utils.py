@@ -17,7 +17,7 @@ def compute_macro_fpr(targets, preds, num_classes):
     """
     Compute the False Positive Rate (FPR) for each class and the macro-average FPR.
     """
-    cm = confusion_matrix(targets, preds, labels=list(range(num_classes)))
+    cm = confusion_matrix(targets, preds, labels=list(range(num_classes)) if num_classes > 1 else [0, 1])
     FP = cm.sum(axis=0) - np.diag(cm)
     TN = cm.sum() - (FP + cm.sum(axis=1) - np.diag(cm) + np.diag(cm))
     with np.errstate(divide='ignore', invalid='ignore'):

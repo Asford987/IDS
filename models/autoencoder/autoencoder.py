@@ -19,10 +19,10 @@ import pandas as pd
 
 
 class AutoEncoderDataset(torch.utils.data.Dataset):
-    def __init__(self, path, binarize_on_label):
+    def __init__(self, path):
         data = pd.read_parquet(path)
         self.X = data.drop(columns=['Label']).astype(np.float32)
-        self.y = np.asarray(data['Label'].astype('category').cat.codes == binarize_on_label, dtype=np.int64) 
+        self.y = np.asarray(data['Label'].astype('category').cat.codes, dtype=np.int64) 
     
     def __getitem__(self, idx):
         return self.X.iloc[idx].values, self.y[idx]
@@ -32,16 +32,15 @@ class AutoEncoderDataset(torch.utils.data.Dataset):
 
 
 class AutoEncoderDataModule(pl.LightningDataModule):
-    def __init__(self, train_path, test_path, binarize_on_label, batch_size=4096):
+    def __init__(self, train_path, test_path, batch_size=4096):
         super(AutoEncoderDataModule, self).__init__()
         self.train_path = train_path
         self.test_path = test_path
         self.batch_size = batch_size
-        self.binarize_on_label = binarize_on_label
         
     def setup(self, stage=None):
-        self.train_dataset = AutoEncoderDataset(self.train_path, self.binarize_on_label)
-        self.test_dataset = AutoEncoderDataset(self.test_path, self.binarize_on_label)
+        self.train_dataset = AutoEncoderDataset(self.train_path)
+        self.test_dataset = AutoEncoderDataset(self.test_path)
         
     def train_dataloader(self):
         return torch.utils.data.DataLoader(

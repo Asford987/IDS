@@ -7,6 +7,9 @@ models/cnn
 models/rnn
 models/base.py
 models/moe/*
+models/moe.py
 !models/ffn
 !models/utils.py
 !models/moe/expert.py
+!models/moe/__init__.py
+data/*.parquet
