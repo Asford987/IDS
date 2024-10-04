@@ -25,7 +25,7 @@ class ExpertPretrainDataset(torch.utils.data.Dataset):
             elif path.endswith('.parquet'): data = pd.read_parquet(path)
         else: data = path
         
-        self.X = data.drop(columns=['Label']).astype(np.float32)
+        self.X = data.drop(columns=['Label']).astype(np.float64)
         self.y = np.asarray(data['Label'] == binarize_on_label, dtype=np.int64) 
     
     def __getitem__(self, idx):
@@ -62,13 +62,13 @@ class ExpertModel(pl.LightningModule):
         self.input_dim = input_dim
         layers = []
         for units in hidden_units:
-            layers.append(nn.BatchNorm1d(input_dim))
-            layers.append(nn.Linear(input_dim, units))
+            layers.append(nn.BatchNorm1d(input_dim, dtype=torch.float64))
+            layers.append(nn.Linear(input_dim, units, dtype=torch.float64))
             layers.append(nn.LeakyReLU())
             if dropout_rate > 0.0:
                 layers.append(nn.Dropout(dropout_rate))
             input_dim = units
-        layers.append(nn.Linear(input_dim, 1))
+        layers.append(nn.Linear(input_dim, 1, dtype=torch.float64))
         self.model = nn.Sequential(*layers)
         self.num_experts = 1
         self.learning_rate = learning_rate
@@ -78,10 +78,14 @@ class ExpertModel(pl.LightningModule):
     def initialize_weights(self):
         for layer in self.model:
             if isinstance(layer, nn.Linear):
-                nn.init.kaiming_uniform_(layer.weight)
+                nn.init.xavier_uniform_(layer.weight)
                 nn.init.zeros_(layer.bias)
     
     def forward(self, x) -> torch.Tensor:
+        
+        print(f"{torch.isnan(x).sum()=}")
+        print(f"{x.dtype=}")
+        
         return self.model(x)
     
     def on_fit_start(self):
@@ -105,10 +109,14 @@ class ExpertModel(pl.LightningModule):
         with torch.no_grad():
             y_hat = self(x)
         preds = (torch.sigmoid(y_hat) >= 0.5).long()
-        
         self.val_preds.append(preds.cpu())
         self.val_logits.append(y_hat.cpu())
         self.val_targets.append(y.cpu())
+        
+        print(f"{y_hat.dtype=}")
+        print(f"{torch.isnan(y_hat).sum()=}")
+        print(f"{y_hat.min().item()=}")
+        print(f"{y_hat.max().item()=}")
         
         total_loss = self.criterion(y_hat, y)
         self.log('val_loss', total_loss, logger=True, prog_bar=True)
@@ -121,6 +129,9 @@ class ExpertModel(pl.LightningModule):
         y_true = label_binarize(targets.numpy(), classes=[0,1])
         logits = torch.cat(self.val_logits)
         y_scores = F.sigmoid(logits).cpu().numpy()
+        
+        print(f"{np.isnan(y_scores).sum()=}")
+        print(f"{np.isnan(y_true).sum()=}")
 
         targets_np = targets.cpu().numpy()
         preds_np = preds.cpu().numpy()
