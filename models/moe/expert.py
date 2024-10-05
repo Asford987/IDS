@@ -82,10 +82,6 @@ class ExpertModel(pl.LightningModule):
                 nn.init.zeros_(layer.bias)
     
     def forward(self, x) -> torch.Tensor:
-        
-        print(f"{torch.isnan(x).sum()=}")
-        print(f"{x.dtype=}")
-        
         return self.model(x)
     
     def on_fit_start(self):
@@ -113,11 +109,6 @@ class ExpertModel(pl.LightningModule):
         self.val_logits.append(y_hat.cpu())
         self.val_targets.append(y.cpu())
         
-        print(f"{y_hat.dtype=}")
-        print(f"{torch.isnan(y_hat).sum()=}")
-        print(f"{y_hat.min().item()=}")
-        print(f"{y_hat.max().item()=}")
-        
         total_loss = self.criterion(y_hat, y)
         self.log('val_loss', total_loss, logger=True, prog_bar=True)
         return total_loss
@@ -130,17 +121,16 @@ class ExpertModel(pl.LightningModule):
         logits = torch.cat(self.val_logits)
         y_scores = F.sigmoid(logits).cpu().numpy()
         
-        print(f"{np.isnan(y_scores).sum()=}")
-        print(f"{np.isnan(y_true).sum()=}")
-
         targets_np = targets.cpu().numpy()
         preds_np = preds.cpu().numpy()
         
         cm = confusion_matrix(targets_np, preds_np, labels=[0, 1])
-        _, fp, fn, _ = cm.ravel()
+        tp, fp, fn, tn = cm.ravel()
         
         self.log('val_fp', fp, prog_bar=True, logger=True)
         self.log('val_fn', fn, prog_bar=True, logger=True)
+        self.log('val_tp', tp, logger=True)
+        self.log('val_tn', tn, logger=True)
         
         f2_score_macro = fbeta_score(targets_np, preds_np, beta=2, average='binary', zero_division='warn')
         precision_macro = precision_score(targets_np, preds_np, average='binary', zero_division='warn')
