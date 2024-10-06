@@ -13,3 +13,4 @@ models/moe.py
 !models/moe/expert.py
 !models/moe/__init__.py
 data/*.parquet
+notebooks/**/output
