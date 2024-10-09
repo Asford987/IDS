@@ -125,7 +125,7 @@ class ExpertModel(pl.LightningModule):
         preds_np = preds.cpu().numpy()
         
         cm = confusion_matrix(targets_np, preds_np, labels=[0, 1])
-        tp, fp, fn, tn = cm.ravel()
+        tn, fp, fn, tp = cm.ravel()
         
         self.log('val_fp', fp, prog_bar=True, logger=True)
         self.log('val_fn', fn, prog_bar=True, logger=True)
@@ -152,7 +152,7 @@ class ExpertModel(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='max', factor=0.5, patience=3, verbose=True, min_lr=1e-6
+            optimizer, mode='max', factor=0.5, patience=5, verbose=True, min_lr=1e-6
         )
         
         schedulers = [
