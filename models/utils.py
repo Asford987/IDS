@@ -1,102 +1,78 @@
-import os
-
 import numpy as np
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import tensorflow as tf
+import tensorflow.keras.backend as K # type: ignore
+import pandas as pd
 
-import warnings
-warnings.filterwarnings("ignore")
-
-from sklearn.metrics import average_precision_score, confusion_matrix
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import pytorch_lightning as pl
-
-
-def compute_macro_fpr(targets, preds, num_classes):
-    """
-    Compute the False Positive Rate (FPR) for each class and the macro-average FPR.
-    """
-    cm = confusion_matrix(targets, preds, labels=list(range(num_classes)) if num_classes > 1 else [0, 1])
-    FP = cm.sum(axis=0) - np.diag(cm)
-    TN = cm.sum() - (FP + cm.sum(axis=1) - np.diag(cm) + np.diag(cm))
-    with np.errstate(divide='ignore', invalid='ignore'):
-        FPR = FP / (FP + TN)
-        FPR = np.nan_to_num(FPR)  # Replace NaN with 0
-    fpr_macro = np.mean(FPR)
-    return fpr_macro, FPR
-
-
-
-def precision_recall_curve_per_class(targets, y_scores, num_classes):
-    pr_aucs = []
-    for i in range(num_classes):
-        binary_targets = (targets == i).astype(int)
-        class_scores = y_scores[:, i]
-        if binary_targets.sum() == 0:
-            pr_auc = np.nan  # Handle classes not present in targets
+def reduce_mem_usage(df):
+    start_mem = df.memory_usage(deep=True).sum() / 1024**2
+    print(f'Initial memory usage: {start_mem:.2f} MB')
+    for col in df.columns:
+        col_type = df[col].dtype
+        if col_type.kind in ['i', 'u', 'f']:
+            c_min = df[col].min()
+            c_max = df[col].max()
+            if pd.api.types.is_integer_dtype(col_type):
+                if c_min >= np.iinfo(np.int8).min and c_max <= np.iinfo(np.int8).max:
+                    df[col] = df[col].astype(np.int8)
+                elif c_min >= np.iinfo(np.int16).min and c_max <= np.iinfo(np.int16).max:
+                    df[col] = df[col].astype(np.int16)
+                elif c_min >= np.iinfo(np.int32).min and c_max <= np.iinfo(np.int32).max:
+                    df[col] = df[col].astype(np.int32)
+            else:
+                if c_min >= np.finfo(np.float16).min and c_max <= np.finfo(np.float16).max:
+                    df[col] = df[col].astype(np.float16)
+                elif c_min >= np.finfo(np.float32).min and c_max <= np.finfo(np.float32).max:
+                    df[col] = df[col].astype(np.float32)
         else:
-            pr_auc = average_precision_score(binary_targets, class_scores)
-        pr_aucs.append(pr_auc)
-    return pr_aucs
+            if df[col].dtype == 'object' and df[col].nunique() / len(df[col]) < 0.5:
+                df[col] = df[col].astype('category')
+    end_mem = df.memory_usage(deep=True).sum() / 1024**2
+    print(f'Optimized memory usage: {end_mem:.2f} MB')
+    print(f'Reduced by {(start_mem - end_mem) / start_mem * 100:.1f}%')
+    return df
 
 
-class FocalLoss(nn.Module):
-    def __init__(self, alpha=1.0, beta=1.0, reduction='mean'):
-        """
-        :param alpha: A scaling factor for class n.
-        :param beta: Focusing parameter to control the degree of loss attenuation.
-        :param class_weights: Optional tensor of class weights for handling class imbalance.
-        :param reduction: Specifies the reduction to apply to the output ('none', 'mean', 'sum').
-        """
-        super(FocalLoss, self).__init__()
-        self.alpha = alpha
-        self.beta = beta
-        self.reduction = reduction
-        self.epsilon = 1e-12
+def multi_f2_score(y_true, y_pred):
+    beta = 2
+    # Convert y_true to one-hot encoding
+    y_true = tf.cast(y_true, 'int32')
+    num_classes = tf.shape(y_pred)[-1]
+    y_true = tf.one_hot(y_true, depth=num_classes)
 
-    def forward(self, inputs, targets):
-        """
-            Forward pass for Focal Loss.
-            :param inputs: Predicted logits of shape [batch_size, num_classes] (for multi-class)
-                or [batch_size, 1] (for binary classification).
-            :param targets: Ground truth labels of shape [batch_size] (binary: 0 or 1, multi-class: class indices).
-        """
-        if inputs.size(1) == 1:
-            probs = torch.sigmoid(inputs).squeeze(1)
-            targets = targets.float()
-        else:
-            targets_one_hot = torch.eye(inputs.size(1), device=targets.device)[targets]
-            probs = F.softmax(inputs, dim=1)
-        
-        if inputs.size(1) == 1:
-            p_t = probs * targets + (1 - probs) * (1 - targets)
-        else:
-            p_t = (probs * targets_one_hot).sum(dim=1)
-        
-        p_t = p_t.clamp(min=self.epsilon, max=1 - self.epsilon)
-        focal_loss = -self.alpha * (1 - p_t) ** self.beta * torch.log(p_t)
-        if self.reduction == 'mean':
-            return focal_loss.mean()
-        elif self.reduction == 'sum':
-            return focal_loss.sum()
-        else:
-            return focal_loss
+    # Convert y_pred to binary predictions
+    y_pred = tf.argmax(y_pred, axis=-1)
+    y_pred = tf.one_hot(y_pred, depth=num_classes)
 
+    y_true = tf.cast(y_true, 'float32')
+    y_pred = tf.cast(y_pred, 'float32')
 
+    # Calculate true positives, false positives, false negatives
+    tp = K.sum(y_true * y_pred, axis=0)
+    fp = K.sum((1 - y_true) * y_pred, axis=0)
+    fn = K.sum(y_true * (1 - y_pred), axis=0)
 
-class WarmupScheduler(torch.optim.lr_scheduler.LRScheduler):
-    def __init__(self, optimizer, warmup_epochs, fixed_lr, prev_lr, last_epoch=-1):
-        self.warmup_epochs = warmup_epochs
-        self.fixed_lr = fixed_lr
-        self.prev_lr = prev_lr
-        self.last_epoch = 0
-        super(WarmupScheduler, self).__init__(optimizer, last_epoch)
+    # Calculate precision and recall
+    precision = tp / (tp + fp + K.epsilon())
+    recall = tp / (tp + fn + K.epsilon())
 
-    def get_lr(self, epoch=None):
-        if self.last_epoch < self.warmup_epochs:
-            return [self.fixed_lr for _ in self.optimizer.param_groups]
-        elif self.last_epoch > self.warmup_epochs:
-            return [group['lr'] for group in self.optimizer.param_groups]
-        else:
-            return [self.prev_lr for _ in self.optimizer.param_groups]
+    beta_squared = beta ** 2
+    f2 = (1 + beta_squared) * (precision * recall) / (beta_squared * precision + recall + K.epsilon())
+
+    # Compute mean F2 across all classes
+    f2 = K.mean(f2)
+    return f2
+
+def f2_score(y_true, y_pred):
+    beta = 2
+    y_pred = K.round(y_pred)
+    # Cast y_true and y_pred to float32
+    y_true = K.cast(y_true, 'float32')
+    y_pred = K.cast(y_pred, 'float32')
+    tp = K.sum(y_true * y_pred)
+    fp = K.sum((1 - y_true) * y_pred)
+    fn = K.sum(y_true * (1 - y_pred))
+    precision = tp / (tp + fp + K.epsilon())
+    recall = tp / (tp + fn + K.epsilon())
+    beta_squared = beta ** 2
+    f2 = (1 + beta_squared) * (precision * recall) / (beta_squared * precision + recall + K.epsilon())
+    return f2

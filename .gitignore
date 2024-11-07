@@ -1,8 +1,7 @@
 *logs
-__pycache__
+**__pycache__
 *.ckpt
 *.zip
 data/*.csv
 data/*.parquet
-notebooks/**/output
-main.py
+out_kaggle
