@@ -95,20 +95,20 @@ class ModelTrainer:
         print(report)
         self.report = report
 
-    def save_history(self, binarize_on_label, model_name):
+    def save_history(self, binarize_on_label, model_name, path='.'):
         history_df = pd.DataFrame(self.history_per_epoch)
-        history_filename = f'history_{model_name}_{binarize_on_label}.csv'
+        history_filename = f'{path}/history_{model_name}_{binarize_on_label}.csv'
         history_df.to_csv(history_filename, index=False)
         print(f"Training history saved to {history_filename}")
 
-    def save_classification_report(self, binarize_on_label, model_name):
-        report_filename = f'classification_report_{model_name}_{binarize_on_label}.txt'
+    def save_classification_report(self, binarize_on_label, model_name, path='.'):
+        report_filename = f'{path}/classification_report_{model_name}_{binarize_on_label}.txt'
         with open(report_filename, 'w') as f:
             f.write(self.report)
         print(f"Classification report saved to {report_filename}")
 
-    def save_model(self, binarize_on_label, model_name):
-        model_filename = f'model_{model_name}_{binarize_on_label}.h5'
+    def save_model(self, binarize_on_label, model_name, path='.'):
+        model_filename = f'{path}/model_{model_name}_{binarize_on_label}.h5'
         self.model.save(model_filename)
         print(f'Model saved as {model_filename}')
 
